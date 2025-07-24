@@ -13,6 +13,9 @@
 # See the Mulan PSL v2 for more details.
 #**************************************************************************************/
 
+count:
+	find . -type f \( -name "*.c" -o -name "*.h" \) -print0 | xargs -0 wc -l | tail -1
+
 # Sanity check
 ifeq ($(wildcard $(NEMU_HOME)/src/nemu-main.c),)
   $(error NEMU_HOME=$(NEMU_HOME) is not a NEMU repo)
@@ -50,6 +53,9 @@ CFLAGS_BUILD += $(if $(CONFIG_CC_ASAN),-fsanitize=address,)
 CFLAGS_TRACE += -DITRACE_COND=$(if $(CONFIG_ITRACE_COND),$(call remove_quote,$(CONFIG_ITRACE_COND)),true)
 CFLAGS  += $(CFLAGS_BUILD) $(CFLAGS_TRACE) -D__GUEST_ISA__=$(GUEST_ISA)
 LDFLAGS += $(CFLAGS_BUILD)
+
+#en..
+CFLAGS += -mcmodel=medium
 
 # Include rules for menuconfig
 include $(NEMU_HOME)/scripts/config.mk

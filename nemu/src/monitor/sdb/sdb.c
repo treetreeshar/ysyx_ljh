@@ -23,6 +23,8 @@ static int is_batch_mode = false;
 
 void init_regex();
 void init_wp_pool();
+word_t paddr_read(paddr_t addr, int len);//先声明
+
 
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 static char* rl_gets() {
@@ -49,10 +51,122 @@ static int cmd_c(char *args) {
 
 
 static int cmd_q(char *args) {
+	nemu_state.state = NEMU_QUIT;
   return -1;
 }
 
 static int cmd_help(char *args);
+
+static int cmd_si(char *args){
+    int steps = 1;
+   if (args) {
+        sscanf(args, "%d", &steps);
+    }
+    cpu_exec(steps);
+    return 0;
+}
+
+static int cmd_info(char *args){
+	char *arg = strtok(NULL, " ");
+	if(arg == NULL) printf("print \'info r or w\'\n");
+	else{
+		switch(*arg){
+			case 'r':{isa_reg_display(); break;}
+			case 'w':{wp_display(); break;}
+			default:{printf("print \'info r or w\'\n"); break;}
+			}
+	}
+	return 0;
+}
+
+static int cmd_x(char*args){
+	char *arg1 = strtok(NULL, " ");
+	char *arg2 = strtok(NULL, " ");
+	if(arg1 == NULL || arg2 == NULL) printf("print \'x N EXPR\'\n");
+	else {
+		char *endptr;
+		long len = strtol(arg1, &endptr, 0);
+		if(*endptr != '\0' || len <= 0) printf("wrong len\n");
+		else{
+			uintptr_t addr = strtoul(arg2, &endptr, 0);
+			if(*endptr != '\0') printf("wrong addr\n");
+			else{
+				for (int i = 0; i < len * 4; i+=4) {
+					printf("0x%08lx: 0x%08x \n ",(unsigned long)addr + i, paddr_read(addr + i, 4));
+				    }
+			}
+		}
+	}
+	return 0;
+}
+
+static int cmd_p(char *args){
+	if(args == NULL){
+		printf("print \'p Expression\'\n");
+	}
+	bool success;
+	uint32_t ans = expr(args, &success);
+	
+	if(success) {
+		printf("Ans: %u\n", ans);
+	}else{
+		printf("Expr failed.Sth is wrong.Maybe Chinese token?\n");
+	}
+	return 0;
+}
+
+static int cmd_w(char *args){
+	if(args == NULL){
+		printf("print \'w Expression\'\n");
+		return 0;
+	}
+	
+	bool success;
+	uint32_t expr_val = expr(args, &success);
+	if (!success) {
+        	printf("Expr failed: %s\n", args);
+        return 1;
+	}
+	else{
+		printf("Expr: %d\n", expr_val);
+	}
+	
+	WP *wp = new_wp();
+	if (wp == NULL) {
+		printf("new_wp failed\n");
+		return 1;
+	}
+	strncpy(wp->expr, args, sizeof(wp->expr) - 1);
+	wp->expr[sizeof(wp->expr) - 1] = '\0';
+	wp->last_val = expr_val;
+	printf("Watchpoint %d: %s (initial value = 0x%x)\n", wp->NO, wp->expr, wp->last_val);
+	return 0;
+}
+
+static int cmd_d(char *args){
+	if(args == NULL){
+		printf("print \'d [N]\'\n");
+		return 0;
+	}
+	char *endptr;
+	long no = strtol(args, &endptr, 10);
+	if(*endptr != '\0' || no < 0){
+        	printf("Invalid number: %s\n", args);
+        	return 0;
+	}
+	WP *wp = head;
+	while(wp != NULL){
+		if(wp->NO == no){
+			printf("Deleted wp %d: %s\n", wp->NO, wp->expr);
+			free_wp(wp);
+			return 0;
+        }
+        wp = wp->next;
+    }
+    
+    printf("No wp: %ld\n", no);
+    return 1;
+}
 
 static struct {
   const char *name;
@@ -62,7 +176,13 @@ static struct {
   { "help", "Display information about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-
+  { "si", "Step in for [N] times", cmd_si },
+  { "info", "Print the information of reg", cmd_info },
+  { "x", "Print internal storage for [N] byte, start from [EXPR]", cmd_x },
+  { "p", "Culculate [Exprssion]", cmd_p },
+  { "w", "Set wathchpoint at [Exprssion]", cmd_w },
+  { "d", "Delete wathchpoint NO.[N]", cmd_d },
+  
   /* TODO: Add more commands */
 
 };
@@ -102,11 +222,11 @@ void sdb_mainloop() {
     return;
   }
 
-  for (char *str; (str = rl_gets()) != NULL; ) {
+  for (char *str; (str = rl_gets()) != NULL; ) {//？？rl_gets返回字符串
     char *str_end = str + strlen(str);
 
     /* extract the first token as the command */
-    char *cmd = strtok(str, " ");
+    char *cmd = strtok(str, " ");//分割
     if (cmd == NULL) { continue; }
 
     /* treat the remaining string as the arguments,

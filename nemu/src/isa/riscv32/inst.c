@@ -73,6 +73,6 @@ static int decode_exec(Decode *s) {
 }
 
 int isa_exec_once(Decode *s) {
-  s->isa.inst = inst_fetch(&s->snpc, 4);
-  return decode_exec(s);
+  s->isa.inst = inst_fetch(&s->snpc, 4);//？获取指令（在nemu/include/cpu）
+  return decode_exec(s);//？解码 执行
 }

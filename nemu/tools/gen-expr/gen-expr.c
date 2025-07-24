@@ -30,10 +30,45 @@ static char *code_format =
 "  printf(\"%%u\", result); "
 "  return 0; "
 "}";
+static int buf_index = 0;
+static int depth = 0;
+
+static void gen_rand_op();
+static void gen_num();
+static void gen(char ch);
+static uint32_t choose(uint32_t n);
 
 static void gen_rand_expr() {
-  buf[0] = '\0';
+	if(depth == 8) {gen_num(); return;}
+	depth++;
+	switch (choose(3)){
+		case 0: gen_num(); break;
+		case 1: gen('('); gen_rand_expr(); gen(')'); break;
+		default: gen_rand_expr(); gen_rand_op(); gen_rand_expr(); break;
+	}
+	depth--;
+	if(rand() % 4 == 0) gen(' ');
 }
+
+static void gen_num(){
+	int num = choose(100) + 1;
+	buf_index += snprintf(buf + buf_index, sizeof(buf) - buf_index, "%d", num);
+}
+
+static void gen(char ch){
+	if(buf_index < sizeof(buf) - 1) buf[buf_index++] = ch;
+	else return;
+}
+
+static void gen_rand_op(){
+	  char ops[] = {'+', '-', '*', '/'};
+	  gen(ops[choose(4)]);
+}
+
+static uint32_t choose(uint32_t n){
+	return rand() % n;
+}
+
 
 int main(int argc, char *argv[]) {
   int seed = time(0);
@@ -44,18 +79,33 @@ int main(int argc, char *argv[]) {
   }
   int i;
   for (i = 0; i < loop; i ++) {
+    buf_index = 0;//
+    depth = 0;//
     gen_rand_expr();
+    buf[buf_index] = '\0';//
 
-    sprintf(code_buf, code_format, buf);
+    sprintf(code_buf, code_format, buf);//生成的表达式放在buf里
 
     FILE *fp = fopen("/tmp/.code.c", "w");
     assert(fp != NULL);
     fputs(code_buf, fp);
     fclose(fp);
 
-    int ret = system("gcc /tmp/.code.c -o /tmp/.expr");
-    if (ret != 0) continue;
-
+    int ret = system("gcc /tmp/.code.c -Wall -Werror=div-by-zero -Werror=overflow -o /tmp/.expr");//调用命令行指令
+    if (ret != 0) continue;//0:编译成功 执行下面代码  非0:跳过下面代码
+	
+    //
+    FILE *fp_expr = popen("/tmp/.expr", "r");
+    if (!fp_expr) continue;
+    
+    unsigned result;
+    int scan_ret = fscanf(fp_expr, "%u", &result);
+    int status = pclose(fp_expr);//检测是否除0？
+    
+    if (scan_ret != 1 || status != 0) continue; 
+    printf("%u %s\n", result, buf);
+	
+    /*
     fp = popen("/tmp/.expr", "r");
     assert(fp != NULL);
 
@@ -64,6 +114,7 @@ int main(int argc, char *argv[]) {
     pclose(fp);
 
     printf("%u %s\n", result, buf);
+    */
   }
   return 0;
 }

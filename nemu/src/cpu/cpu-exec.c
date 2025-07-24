@@ -17,6 +17,9 @@
 #include <cpu/decode.h>
 #include <cpu/difftest.h>
 #include <locale.h>
+#include "../src/monitor/sdb/sdb.h"
+
+word_t expr(char *e, bool *success);
 
 /* The assembly code of instructions executed is only output to the screen
  * when the number of instructions executed is less than this value.
@@ -26,26 +29,32 @@
 #define MAX_INST_TO_PRINT 10
 
 CPU_state cpu = {};
-uint64_t g_nr_guest_inst = 0;
+uint64_t g_nr_guest_inst = 0;//指令计数器
 static uint64_t g_timer = 0; // unit: us
 static bool g_print_step = false;
 
 void device_update();
 
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
-#ifdef CONFIG_ITRACE_COND
+#ifdef CONFIG_ITRACE_COND //是否启用指令跟踪
   if (ITRACE_COND) { log_write("%s\n", _this->logbuf); }
 #endif
   if (g_print_step) { IFDEF(CONFIG_ITRACE, puts(_this->logbuf)); }
-  IFDEF(CONFIG_DIFFTEST, difftest_step(_this->pc, dnpc));
+  IFDEF(CONFIG_DIFFTEST, difftest_step(_this->pc, dnpc));//是否启用差分测试
+#ifdef CONFIG_WATCHPOINT//是否启用监视点
+    if (wp_scan()) {
+        nemu_state.state = NEMU_STOP;
+        sdb_mainloop();
+    }
+#endif
 }
 
 static void exec_once(Decode *s, vaddr_t pc) {
-  s->pc = pc;
-  s->snpc = pc;
-  isa_exec_once(s);
-  cpu.pc = s->dnpc;
-#ifdef CONFIG_ITRACE
+  s->pc = pc;//当前指令地址
+  s->snpc = pc;//下条指令地址（会被更新）
+  isa_exec_once(s);//执行（isa/inst.c）
+  cpu.pc = s->dnpc;//更新pc
+#ifdef CONFIG_ITRACE//反汇编
   char *p = s->logbuf;
   p += snprintf(p, sizeof(s->logbuf), FMT_WORD ":", s->pc);
   int ilen = s->snpc - s->pc;
@@ -73,14 +82,15 @@ static void exec_once(Decode *s, vaddr_t pc) {
 
 static void execute(uint64_t n) {
   Decode s;
-  for (;n > 0; n --) {
-    exec_once(&s, cpu.pc);
-    g_nr_guest_inst ++;
-    trace_and_difftest(&s, cpu.pc);
-    if (nemu_state.state != NEMU_RUNNING) break;
-    IFDEF(CONFIG_DEVICE, device_update());
+  for (;n > 0; n --) {//执行n条指令
+    exec_once(&s, cpu.pc);//执行一条指令
+    g_nr_guest_inst ++;//指令计数器++
+    trace_and_difftest(&s, cpu.pc);//处理跟踪和差分测试
+    if (nemu_state.state != NEMU_RUNNING) break;//如果状态为停止：停止
+    IFDEF(CONFIG_DEVICE, device_update());//？更新状态
   }
 }
+
 
 static void statistic() {
   IFNDEF(CONFIG_TARGET_AM, setlocale(LC_NUMERIC, ""));
@@ -98,20 +108,20 @@ void assert_fail_msg() {
 
 /* Simulate how the CPU works. */
 void cpu_exec(uint64_t n) {
-  g_print_step = (n < MAX_INST_TO_PRINT);
-  switch (nemu_state.state) {
+  g_print_step = (n < MAX_INST_TO_PRINT);//n<10详细打印？
+  switch (nemu_state.state) {//检查模拟器状态
     case NEMU_END: case NEMU_ABORT: case NEMU_QUIT:
       printf("Program execution has ended. To restart the program, exit NEMU and run again.\n");
-      return;
-    default: nemu_state.state = NEMU_RUNNING;
+      return;//结束：返回
+    default: nemu_state.state = NEMU_RUNNING;//否则设置为运行
   }
 
-  uint64_t timer_start = get_time();
+  uint64_t timer_start = get_time();//获取时间
 
-  execute(n);
+  execute(n);//执行n条指令
 
   uint64_t timer_end = get_time();
-  g_timer += timer_end - timer_start;
+  g_timer += timer_end - timer_start;//计算运行时间
 
   switch (nemu_state.state) {
     case NEMU_RUNNING: nemu_state.state = NEMU_STOP; break;
