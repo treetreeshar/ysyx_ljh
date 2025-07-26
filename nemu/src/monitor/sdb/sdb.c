@@ -71,7 +71,7 @@ static int cmd_info(char *args){
 	if(arg == NULL) printf("print \'info r or w\'\n");
 	else{
 		switch(*arg){
-			case 'r':{isa_reg_display(); break;}
+			case 'r':{printf("pc: 0x%x\n",cpu.pc);isa_reg_display(); break;}
 			case 'w':{wp_display(); break;}
 			default:{printf("print \'info r or w\'\n"); break;}
 			}
@@ -88,11 +88,11 @@ static int cmd_x(char*args){
 		long len = strtol(arg1, &endptr, 0);
 		if(*endptr != '\0' || len <= 0) printf("wrong len\n");
 		else{
-			uintptr_t addr = strtoul(arg2, &endptr, 0);
+			unsigned long addr = strtoul(arg2, &endptr, 0);
 			if(*endptr != '\0') printf("wrong addr\n");
 			else{
 				for (int i = 0; i < len * 4; i+=4) {
-					printf("0x%08lx: 0x%08x \n ",(unsigned long)addr + i, paddr_read(addr + i, 4));
+					printf("0x%08lx: 0x%08x \n ",addr + i, paddr_read(addr + i, 4));
 				    }
 			}
 		}
@@ -157,7 +157,7 @@ static int cmd_d(char *args){
 	WP *wp = head;
 	while(wp != NULL){
 		if(wp->NO == no){
-			printf("Deleted wp %d: %s\n", wp->NO, wp->expr);
+			printf("Delete watchpoint %d: %s\n", wp->NO, wp->expr);
 			free_wp(wp);
 			return 0;
         }
@@ -177,7 +177,7 @@ static struct {
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
   { "si", "Step in for [N] times", cmd_si },
-  { "info", "Print the information of reg", cmd_info },
+  { "info", "Print the information of [r]eg/[w]atchpoint", cmd_info },
   { "x", "Print internal storage for [N] byte, start from [EXPR]", cmd_x },
   { "p", "Culculate [Exprssion]", cmd_p },
   { "w", "Set wathchpoint at [Exprssion]", cmd_w },

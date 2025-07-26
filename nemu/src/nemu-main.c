@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 #else
   init_monitor(argc, argv);
 #endif
-  
+/*
   FILE *fp = fopen("./tools/gen-expr/input", "r");
     if(fp == NULL) {
         printf("Can't open");
@@ -47,9 +47,9 @@ int main(int argc, char *argv[]) {
 
     while(fgets(line, sizeof(line), fp)){
         total++;
-        line[strcspn(line, "\n")] = 0;//将换行符设置为字符串结束字符\0
+        line[strcspn(line, "\n")] = '\0';
         
-        char *space = strchr(line, ' ');//查找空格
+        char *space = strchr(line, ' ');
         if(!space){
             printf("Can't find space");
             continue;
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
 
     fclose(fp);
     printf("Summary: %d/%d passed\n", pass, total);
-    
+    */
   /* Start engine. */
   engine_start();
 

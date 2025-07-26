@@ -17,18 +17,6 @@
 
 #define NR_WP 32
 
-/*
-typedef struct watchpoint {
-  int NO;
-  struct watchpoint *next;
-
-  // TODO: Add more members if necessary 
-  char expr[128];
-  uint32_t last_val;
-
-} WP;
-*/
-
 static WP wp_pool[NR_WP] = {};
 WP *head = NULL;
 static WP *free_ = NULL;
@@ -56,7 +44,7 @@ WP *new_wp(){
 	WP *wp = free_;//使wp声明在函数顶部（不在else中）
 	free_ = free_->next;
 		
-	wp->next = head;//先让新节点指向原链表的（下一个/指针）？
+	wp->next = head;//先让新节点指向原链表的（下一个/指针）
 	head = wp;//再让原链表的指针指向新节点
 		
 	wp->expr[0] = '\0';//初始化表达式字符串
@@ -127,26 +115,6 @@ bool wp_scan(){
     }
     return changed;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

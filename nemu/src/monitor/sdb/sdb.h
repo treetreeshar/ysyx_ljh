@@ -31,7 +31,7 @@ typedef struct watchpoint {
 
 } WP;
 
-extern WP *head;  // 声明全局变量
+extern WP *head;//声明全局变量
 
 void init_wp_pool();
 void wp_display();

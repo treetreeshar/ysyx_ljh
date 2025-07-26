@@ -87,7 +87,7 @@ static void execute(uint64_t n) {
     g_nr_guest_inst ++;//指令计数器++
     trace_and_difftest(&s, cpu.pc);//处理跟踪和差分测试
     if (nemu_state.state != NEMU_RUNNING) break;//如果状态为停止：停止
-    IFDEF(CONFIG_DEVICE, device_update());//？更新状态
+    IFDEF(CONFIG_DEVICE, device_update());//更新状态？继续执行下一条指令
   }
 }
 

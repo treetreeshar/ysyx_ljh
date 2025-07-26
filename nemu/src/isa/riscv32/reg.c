@@ -28,7 +28,7 @@ void isa_reg_display() {
 		printf("%s: "FMT_WORD"  ",regs[i],cpu.gpr[i]);
 		if((i+1)%4==0)printf("\n");
 	}
-	printf("\n");
+	//printf("\n");
 }
 
 word_t isa_reg_str2val(const char *s, bool *success) {

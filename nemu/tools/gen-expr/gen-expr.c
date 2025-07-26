@@ -39,7 +39,7 @@ static void gen(char ch);
 static uint32_t choose(uint32_t n);
 
 static void gen_rand_expr() {
-	if(depth == 8) {gen_num(); return;}
+	if(depth == 10) {gen_num(); return;}
 	depth++;
 	switch (choose(3)){
 		case 0: gen_num(); break;
@@ -93,19 +93,7 @@ int main(int argc, char *argv[]) {
 
     int ret = system("gcc /tmp/.code.c -Wall -Werror=div-by-zero -Werror=overflow -o /tmp/.expr");//调用命令行指令
     if (ret != 0) continue;//0:编译成功 执行下面代码  非0:跳过下面代码
-	
-    //
-    FILE *fp_expr = popen("/tmp/.expr", "r");
-    if (!fp_expr) continue;
-    
-    unsigned result;
-    int scan_ret = fscanf(fp_expr, "%u", &result);
-    int status = pclose(fp_expr);//检测是否除0？
-    
-    if (scan_ret != 1 || status != 0) continue; 
-    printf("%u %s\n", result, buf);
-	
-    /*
+   
     fp = popen("/tmp/.expr", "r");
     assert(fp != NULL);
 
@@ -114,7 +102,7 @@ int main(int argc, char *argv[]) {
     pclose(fp);
 
     printf("%u %s\n", result, buf);
-    */
+    
   }
   return 0;
 }

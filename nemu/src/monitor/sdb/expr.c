@@ -26,7 +26,7 @@ extern const char *regs[32];
 word_t vaddr_read(vaddr_t addr, int len);
 
 enum {//枚举 自动+1
-  TK_NOTYPE = 256, TK_EQ, TK_NUM, TK_NEQ, TK_AND, TK_REG, TK_PTR
+  TK_NOTYPE = 256, TK_EQ, TK_NUM, TK_NEQ, TK_AND, TK_REG, TK_PTR, TK_MUS
 
   /* TODO: Add more token types */
 
@@ -129,15 +129,30 @@ static bool make_token(char *e) {
         	case ')' : tokens[nr_token].type=')'; nr_token++; break;
         	
         	case '*' : 
-        		if( 
-        			tokens[nr_token-1].type == TK_NUM || 
-				tokens[nr_token-1].type == ')') {
-				tokens[nr_token].type='*';/*printf("x\n");*/ nr_token++; break;}
-        		else {tokens[nr_token].type=TK_PTR;/*printf("ptr\n");*/ break;}
+        		if(     tokens[nr_token-1].type == 0 || 
+				tokens[nr_token-1].type == '(' ||
+				tokens[nr_token-1].type == '+' || 
+				tokens[nr_token-1].type == '-' ||
+				tokens[nr_token-1].type == '*' || 
+				tokens[nr_token-1].type == '/' 
+				){
+				tokens[nr_token].type=TK_PTR; nr_token++; break;}
+        		else {tokens[nr_token].type='*'; nr_token++; break;}
         	
         	case '/' : tokens[nr_token].type='/'; nr_token++; break;
         	case '+' : tokens[nr_token].type='+'; nr_token++; break;
-        	case '-' : tokens[nr_token].type='-'; nr_token++; break;
+        	
+        	case '-' : 
+        		if(     tokens[nr_token-1].type == 0 || 
+				tokens[nr_token-1].type == '(' ||
+				tokens[nr_token-1].type == '+' || 
+				tokens[nr_token-1].type == '-' ||
+				tokens[nr_token-1].type == '*' || 
+				tokens[nr_token-1].type == '/' 
+				){
+        			tokens[nr_token].type=TK_MUS; nr_token++; break;}
+        		else{tokens[nr_token].type='-';nr_token++; break;}
+        	
         	case TK_NUM :   tokens[nr_token].type=TK_NUM; 
         			int len = pmatch.rm_eo - pmatch.rm_so;
 				if(len >= 32) {printf("num is too long\n"); return false;}
@@ -178,15 +193,13 @@ int32_t eval(int p, int q,bool *success){
 	}	
 	
 	//求值
-	if(p > q){
+	if (tokens[p].type == TK_MUS) {
+	    return -eval(p+1, q, success);
+	}
+	else if(p > q){
 		printf("bad expression\n");
 		*success = false;
 		return false;
-	}
-	else if(tokens[p].type == '-') {
-		uint32_t val = eval(p+1, q, success);
-		if(!*success) {printf("type - eval failed"); return 0;}
-		else{return -val;}
 	}
 	else if(p == q) {
 		switch(tokens[p].type) {
@@ -201,13 +214,14 @@ int32_t eval(int p, int q,bool *success){
 		            *success = false;
 		        }
 		        return val;
-				
+		  
 		    default:
 		        printf("Invalid single token: type=%d\n", tokens[p].type);
 		        *success = false;
 		        return 0;
+			}
 		}
-	    }
+	    
 	else if(check_parentheses(p, q) == true){
 		return eval(p + 1, q - 1, success);
 	}
@@ -294,7 +308,8 @@ int find_priority(int a){
 		case '+': 
 		case '-': return 3;
 		case '*': 
-		case '/': return 2;
+		case '/':
+		case TK_MUS: return 2;
 		case TK_PTR: return 1;
 		default: return 0;
 		}
