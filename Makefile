@@ -1,44 +1,174 @@
-STUID = ysyx_22040000
-STUNAME = whatever
+# Makefile for AbstractMachine Kernels and Libraries
 
-# DO NOT modify the following code!!!
+### *Get a more readable version of this Makefile* by `make html` (requires python-markdown)
+html:
+	cat Makefile | sed 's/^\([^#]\)/    \1/g' | markdown_py > Makefile.html
+.PHONY: html
 
-TRACER = tracer-ysyx
-GITFLAGS = -q --author='$(TRACER) <tracer@ysyx.org>' --no-verify --allow-empty
+## 1. Basic Setup and Checks
 
-YSYX_HOME = $(NEMU_HOME)/..
-WORK_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
-WORK_INDEX = $(YSYX_HOME)/.git/index.$(WORK_BRANCH)
-TRACER_BRANCH = $(TRACER)
+### Default to create a bare-metal kernel image
+#默认目标：image？
+ifeq ($(MAKECMDGOALS),)
+  MAKECMDGOALS  = image
+  .DEFAULT_GOAL = image
+endif
 
-LOCK_DIR = $(YSYX_HOME)/.git/
+### Override checks when `make clean/clean-all/html`
+ifeq ($(findstring $(MAKECMDGOALS),clean|clean-all|html),)
 
-# prototype: git_soft_checkout(branch)
-define git_soft_checkout
-	git checkout --detach -q && git reset --soft $(1) -q -- && git checkout $(1) -q --
-endef
+### Print build info message
+#打印信息
+$(info # Building $(NAME)-$(MAKECMDGOALS) [$(ARCH)])
 
-# prototype: git_commit(msg)
-define git_commit
-	-@flock $(LOCK_DIR) $(MAKE) -C $(YSYX_HOME) .git_commit MSG='$(1)'
-	-@sync $(LOCK_DIR)
-endef
+### Check: environment variable `$AM_HOME` looks sane
+#检查这个文件是否存在
+ifeq ($(wildcard $(AM_HOME)/am/include/am.h),)
+  $(error $$AM_HOME must be an AbstractMachine repo)
+endif
 
-.git_commit:
-	-@while (test -e .git/index.lock); do sleep 0.1; done;               `# wait for other git instances`
-	-@git branch $(TRACER_BRANCH) -q 2>/dev/null || true                 `# create tracer branch if not existent`
-	-@cp -a .git/index $(WORK_INDEX)                                     `# backup git index`
-	-@$(call git_soft_checkout, $(TRACER_BRANCH))                        `# switch to tracer branch`
-	-@git add . -A --ignore-errors                                       `# add files to commit`
-	-@(echo "> $(MSG)" && echo $(STUID) $(STUNAME) && uname -a && uptime `# generate commit msg`) \
-	                | git commit -F - $(GITFLAGS)                        `# commit changes in tracer branch`
-	-@$(call git_soft_checkout, $(WORK_BRANCH))                          `# switch to work branch`
-	-@mv $(WORK_INDEX) .git/index                                        `# restore git index`
+### Check: environment variable `$ARCH` must be in the supported list
+#检查ARCH输入是否正确
+ARCHS = $(basename $(notdir $(shell ls $(AM_HOME)/scripts/*.mk)))
+ifeq ($(filter $(ARCHS), $(ARCH)), )
+  $(error Expected $$ARCH in {$(ARCHS)}, Got "$(ARCH)")
+endif
 
-.clean_index:
-	rm -f $(WORK_INDEX)
+### Extract instruction set architecture (`ISA`) and platform from `$ARCH`. Example: `ARCH=x86_64-qemu -> ISA=x86_64; PLATFORM=qemu`
+#拆分ISA和平台名
+ARCH_SPLIT = $(subst -, ,$(ARCH))
+ISA        = $(word 1,$(ARCH_SPLIT))
+PLATFORM   = $(word 2,$(ARCH_SPLIT))
 
-_default:
-	@echo "Please run 'make' under subprojects."
+### Check if there is something to build
+#检查变量SRCS的状态 SRCS（源文件路径？）应该在其他mk文件里定义?
+ifeq ($(flavor SRCS), undefined)
+  $(error Nothing to build)
+endif
 
-.PHONY: .git_commit .clean_index _default
+### Checks end here
+endif
+
+## 2. General Compilation Targets
+
+### Create the destination directory (`build/$ARCH`)
+#创建目录
+WORK_DIR  = $(shell pwd)
+DST_DIR   = $(WORK_DIR)/build/$(ARCH)
+$(shell mkdir -p $(DST_DIR))
+
+### Compilation targets (a binary image or archive)
+#image:绝对路径 .elf可执行文件？archive:.a静态库？
+IMAGE_REL = build/$(NAME)-$(ARCH)
+IMAGE     = $(abspath $(IMAGE_REL))
+ARCHIVE   = $(WORK_DIR)/build/$(NAME)-$(ARCH).a
+
+### Collect the files to be linked: object files (`.o`) and libraries (`.a`)
+#OBJS：目标文件列表 把源文件路径转换为目标文件路径
+#LIBS： 依赖库列表？ 添加自定义库？ 立即赋值避免递归展开导致无限循环
+#LINKAGE：链接输入文件？addprefix：为每个单词添加前缀 addsuffix：为每个单词添加后缀 join：并行合并两个列表
+OBJS      = $(addprefix $(DST_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
+LIBS     := $(sort $(LIBS) am klib) # lazy evaluation ("=") causes infinite recursions
+LINKAGE   = $(OBJS) \
+  $(addsuffix -$(ARCH).a, $(join \
+    $(addsuffix /build/, $(addprefix $(AM_HOME)/, $(LIBS))), \
+    $(LIBS) ))
+
+## 3. General Compilation Flags
+
+### (Cross) compilers, e.g., mips-linux-gnu-g++
+AS        = $(CROSS_COMPILE)gcc
+CC        = $(CROSS_COMPILE)gcc
+CXX       = $(CROSS_COMPILE)g++
+LD        = $(CROSS_COMPILE)ld
+AR        = $(CROSS_COMPILE)ar
+OBJDUMP   = $(CROSS_COMPILE)objdump
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+READELF   = $(CROSS_COMPILE)readelf
+
+### Compilation flags
+#-I：GCC 的头文件搜索路径标志
+INC_PATH += $(WORK_DIR)/include $(addsuffix /include/, $(addprefix $(AM_HOME)/, $(LIBS)))
+INCFLAGS += $(addprefix -I, $(INC_PATH))
+
+ARCH_H := arch/$(ARCH).h
+CFLAGS   += -O2 -MMD -Wall -Werror $(INCFLAGS) \
+            -D__ISA__=\"$(ISA)\" -D__ISA_$(shell echo $(ISA) | tr a-z A-Z)__ \
+            -D__ARCH__=$(ARCH) -D__ARCH_$(shell echo $(ARCH) | tr a-z A-Z | tr - _) \
+            -D__PLATFORM__=$(PLATFORM) -D__PLATFORM_$(shell echo $(PLATFORM) | tr a-z A-Z | tr - _) \
+            -DARCH_H=\"$(ARCH_H)\" \
+            -fno-asynchronous-unwind-tables -fno-builtin -fno-stack-protector \
+            -Wno-main -U_FORTIFY_SOURCE -fvisibility=hidden
+CXXFLAGS +=  $(CFLAGS) -ffreestanding -fno-rtti -fno-exceptions
+ASFLAGS  += -MMD $(INCFLAGS)
+LDFLAGS  += -z noexecstack $(addprefix -T, $(LDSCRIPTS))
+
+## 4. Arch-Specific Configurations
+
+### Paste in arch-specific configurations (e.g., from `scripts/x86_64-qemu.mk`)
+-include $(AM_HOME)/scripts/$(ARCH).mk
+
+## 5. Compilation Rules
+
+### Rule (compile): a single `.c` -> `.o` (gcc)
+$(DST_DIR)/%.o: %.c
+	@mkdir -p $(dir $@) && echo + CC $<
+	@$(CC) -std=gnu11 $(CFLAGS) -c -o $@ $(realpath $<)
+
+### Rule (compile): a single `.cc` -> `.o` (g++)
+$(DST_DIR)/%.o: %.cc
+	@mkdir -p $(dir $@) && echo + CXX $<
+	@$(CXX) -std=c++17 $(CXXFLAGS) -c -o $@ $(realpath $<)
+
+### Rule (compile): a single `.cpp` -> `.o` (g++)
+$(DST_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@) && echo + CXX $<
+	@$(CXX) -std=c++17 $(CXXFLAGS) -c -o $@ $(realpath $<)
+
+### Rule (compile): a single `.S` -> `.o` (gcc, which preprocesses and calls as)
+$(DST_DIR)/%.o: %.S
+	@mkdir -p $(dir $@) && echo + AS $<
+	@$(AS) $(ASFLAGS) -c -o $@ $(realpath $<)
+
+### Rule (recursive make): build a dependent library (am, klib, ...)
+$(LIBS): %:
+	@$(MAKE) -s -C $(AM_HOME)/$* archive
+
+### Rule (link): objects (`*.o`) and libraries (`*.a`) -> `IMAGE.elf`, the final ELF binary to be packed into image (ld)
+$(IMAGE).elf: $(LINKAGE) $(LDSCRIPTS)
+	@echo \# Creating image [$(ARCH)]
+	@echo + LD "->" $(IMAGE_REL).elf
+ifneq ($(filter $(ARCH),native),)
+	@$(CXX) -o $@ -Wl,--whole-archive $(LINKAGE) -Wl,-no-whole-archive $(LDFLAGS_CXX)
+else
+	@$(LD) $(LDFLAGS) -o $@ --start-group $(LINKAGE) --end-group
+endif
+
+### Rule (archive): objects (`*.o`) -> `ARCHIVE.a` (ar)
+$(ARCHIVE): $(OBJS)
+	@echo + AR "->" $(shell realpath $@ --relative-to .)
+	@$(AR) rcs $@ $^
+
+### Rule (`#include` dependencies): paste in `.d` files generated by gcc on `-MMD`
+-include $(addprefix $(DST_DIR)/, $(addsuffix .d, $(basename $(SRCS))))
+
+## 6. Miscellaneous
+
+### Build order control
+image: image-dep
+archive: $(ARCHIVE)
+image-dep: $(LIBS) $(IMAGE).elf
+.NOTPARALLEL: image-dep
+.PHONY: image image-dep archive run $(LIBS)
+
+### Clean a single project (remove `build/`)
+clean:
+	rm -rf Makefile.html $(WORK_DIR)/build/
+.PHONY: clean
+
+### Clean all sub-projects within depth 2 (and ignore errors)
+CLEAN_ALL = $(dir $(shell find . -mindepth 2 -name Makefile))
+clean-all: $(CLEAN_ALL) clean
+$(CLEAN_ALL):
+	-@$(MAKE) -s -C $@ clean
+.PHONY: clean-all $(CLEAN_ALL)
