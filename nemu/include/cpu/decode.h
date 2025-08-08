@@ -26,6 +26,15 @@ typedef struct Decode {
   IFDEF(CONFIG_ITRACE, char logbuf[128]);
 } Decode;
 
+#define BUFFER_SIZE 16
+typedef struct{
+  word_t buf[BUFFER_SIZE];
+  int write_pos;
+  int read_pos;
+  int cnt;
+  int overwrite;
+} iringbuf;
+
 // --- pattern matching mechanism ---
 __attribute__((always_inline))
 static inline void pattern_decode(const char *str, int len,

@@ -15,6 +15,7 @@
 
 #include <isa.h>
 #include <memory/paddr.h>
+#include <elf.h>
 
 void init_rand();
 void init_log(const char *log_file);
@@ -23,6 +24,10 @@ void init_difftest(char *ref_so_file, long img_size, int port);
 void init_device();
 void init_sdb();
 void init_disasm();
+void init_ftrace();
+
+FuncSymbol *func_symbols = NULL;
+int func_count = 0;
 
 static void welcome() {
   Log("Trace: %s", MUXDEF(CONFIG_TRACE, ANSI_FMT("ON", ANSI_FG_GREEN), ANSI_FMT("OFF", ANSI_FG_RED)));
@@ -44,6 +49,7 @@ void sdb_set_batch_mode();
 static char *log_file = NULL;
 static char *diff_so_file = NULL;
 static char *img_file = NULL;
+static char *ftrace_file = NULL;
 static int difftest_port = 1234;
 
 static long load_img() {
@@ -74,15 +80,17 @@ static int parse_args(int argc, char *argv[]) {
     {"log"      , required_argument, NULL, 'l'},
     {"diff"     , required_argument, NULL, 'd'},
     {"port"     , required_argument, NULL, 'p'},
+    {"ftrace"   , required_argument, NULL, 'f'},
     {"help"     , no_argument      , NULL, 'h'},
     {0          , 0                , NULL,  0 },
   };
   int o;
-  while ( (o = getopt_long(argc, argv, "-bhl:d:p:", table, NULL)) != -1) {
+  while ( (o = getopt_long(argc, argv, "-bhl:d:p:f:", table, NULL)) != -1) {
     switch (o) {
       case 'b': sdb_set_batch_mode(); break;
       case 'p': sscanf(optarg, "%d", &difftest_port); break;
       case 'l': log_file = optarg; break;
+      case 'f': ftrace_file = optarg; break;
       case 'd': diff_so_file = optarg; break;
       case 1: img_file = optarg; return 0;
       default:
@@ -115,6 +123,11 @@ void init_monitor(int argc, char *argv[]) {
 
   /* Initialize devices. */
   IFDEF(CONFIG_DEVICE, init_device());
+
+  /*ftrace*/
+  if(ftrace_file != NULL){
+    init_ftrace(ftrace_file);
+  }
 
   /* Perform ISA dependent initialization. */
   init_isa();
@@ -151,3 +164,155 @@ void am_init_monitor() {
   welcome();
 }
 #endif
+
+/***********************ftrace***********************/
+
+void init_ftrace(const char *ftrace_file){
+  FILE *fp = fopen(ftrace_file, "rb");
+  if(!fp){
+    printf("ftrace: failed to open file.\n");
+    return;
+  }
+
+  Elf32_Ehdr ehdr;
+  if(fread(&ehdr, sizeof(ehdr), 1, fp) != 1) {
+    printf("Failed to read ELF header.\n");
+    fclose(fp);
+    return;
+  }
+
+  if(memcmp(ehdr.e_ident, ELFMAG, SELFMAG) != 0){
+    printf("Not an ELF file.\n");
+    fclose(fp);
+    return;
+  }
+
+  fseek(fp, ehdr.e_shoff, SEEK_SET);//节头表偏移量, 从文件头开始
+  Elf32_Shdr *shdr = malloc(ehdr.e_shentsize * ehdr.e_shnum);//单个节头表条目的大小*节头表条目数量
+  assert(shdr != NULL);
+  if (fread(shdr, ehdr.e_shentsize, ehdr.e_shnum, fp) != ehdr.e_shnum) {
+    free(shdr);
+    fclose(fp);
+    assert(0 && "Failed to read section headers");
+  }//读取节头表 每次读取, 读取次数
+
+  char* shstrtab = (char*)malloc(shdr[ehdr.e_shstrndx].sh_size);//节名称字符串表的大小
+  fseek(fp, shdr[ehdr.e_shstrndx].sh_offset, SEEK_SET);//节名称字符串表偏移量
+  if (fread(shstrtab, 1, shdr[ehdr.e_shstrndx].sh_size, fp) != shdr[ehdr.e_shstrndx].sh_size) {
+    free(shstrtab);
+    free(shdr);
+    fclose(fp);
+    assert(0 && "Failed to read section string table");
+  }//读取节名称字符串表
+
+  Elf32_Shdr* symtab_shdr = NULL;
+  Elf32_Shdr* strtab_shdr = NULL;
+
+  for (int i = 0; i < ehdr.e_shnum; i++) {//节头表条目总数
+    char* section_name = shstrtab + shdr[i].sh_name;//获取节名称
+    if (strcmp(section_name, ".symtab") == 0) {//符号
+      symtab_shdr = &shdr[i];
+    } else if (strcmp(section_name, ".strtab") == 0) {//字符串
+      strtab_shdr = &shdr[i];
+    }
+  }
+
+  if (!symtab_shdr || !strtab_shdr) {
+    printf("Symbol table or string table not found.\n");
+    free(shstrtab);
+    free(shdr);
+    fclose(fp);
+    return;
+  }
+    
+  char* strtab = (char*)malloc(strtab_shdr->sh_size);
+  fseek(fp, strtab_shdr->sh_offset, SEEK_SET);
+  if (fread(strtab, 1, strtab_shdr->sh_size, fp) != strtab_shdr->sh_size) {
+    free(strtab);
+    free(shstrtab);
+    free(shdr);
+    fclose(fp);
+    assert(0 && "Failed to read string table");
+  }//读取字符串表
+
+  Elf32_Sym* symtab = (Elf32_Sym*)malloc(symtab_shdr->sh_size);//节的大小
+  fseek(fp, symtab_shdr->sh_offset, SEEK_SET);
+  if (fread(symtab, 1, symtab_shdr->sh_size, fp) != symtab_shdr->sh_size) {
+    free(symtab);
+    free(strtab);
+    free(shstrtab);
+    free(shdr);
+    fclose(fp);
+    assert(0 && "Failed to read symbol table");
+  }//读取符号表
+
+  int num_funcs = 0;
+  for (int i = 0; i < symtab_shdr->sh_size / sizeof(Elf32_Sym); i++) {
+    if (ELF32_ST_TYPE(symtab[i].st_info) == STT_FUNC) {
+      num_funcs++;
+    }
+  }//统计函数符号数量
+
+  func_symbols = malloc(num_funcs * sizeof(FuncSymbol));//保存函数符号信息
+    
+  for (int i = 0; i < symtab_shdr->sh_size / sizeof(Elf32_Sym); i++) {
+    if (ELF32_ST_TYPE(symtab[i].st_info) == STT_FUNC) {
+      func_symbols[func_count].addr = symtab[i].st_value;
+      func_symbols[func_count].size = symtab[i].st_size;
+      func_symbols[func_count].name = strtab + symtab[i].st_name;
+      func_count++;
+    }
+  }
+
+  free(symtab);
+  free(strtab);
+  free(shdr);
+  free(shstrtab);
+  fclose(fp);
+
+}
+/*
+  
+  printf("Loaded %d function symbols:\n", func_count);
+    for (int i = 0; i < func_count; i++) {
+        printf("  [0x%08x] %s (size: %u bytes)\n", 
+               func_symbols[i].addr, 
+               func_symbols[i].name, 
+               func_symbols[i].size);
+    }
+
+记得在程序退出时释放 func_symbols 的内存。?
+
+
+typedef struct
+{
+  unsigned char	e_ident[EI_NIDENT];	 魔数和文件标识
+  Elf32_Half	e_type;	               文件类型（可执行/共享库等）
+  Elf32_Half	e_machine;             CPU架构
+  Elf32_Word	e_version;             ELF版本
+  Elf32_Addr	e_entry;	             程序入口地址
+  Elf32_Off	e_phoff;	               程序头表偏移
+  Elf32_Off	e_shoff;		             节头表偏移
+  Elf32_Word	e_flags;		           处理器特定标志
+  Elf32_Half	e_ehsize;		           ELF头大小
+  Elf32_Half	e_phentsize;           程序头表条目大小
+  Elf32_Half	e_phnum;		           程序头表条目数
+  Elf32_Half	e_shentsize;           节头表条目大小
+  Elf32_Half	e_shnum;		           节头表条目数
+  Elf32_Half	e_shstrndx;	           节名字符串表索引
+} Elf32_Ehdr;
+
+typedef struct
+{
+  Elf32_Word	sh_name;      节名称在 .shstrtab 字符串表中的偏移量	
+  Elf32_Word	sh_type;      节的类型
+  Elf32_Word	sh_flags;     节的属性标志（可读/可写/可执行）
+  Elf32_Addr	sh_addr;      节加载到内存时的虚拟地址（若不可加载则为 0）
+  Elf32_Off	sh_offset;      节在ELF文件中的起始偏移量（字节）
+  Elf32_Word	sh_size;      节的大小（字节）
+  Elf32_Word	sh_link;      依赖的关联节索引
+  Elf32_Word	sh_info;      附加信息
+  Elf32_Word	sh_addralign; 节的内存对齐要求
+  Elf32_Word	sh_entsize;   固定大小节的条目大小
+  } Elf32_Shdr;
+*/

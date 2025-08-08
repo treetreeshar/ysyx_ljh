@@ -20,6 +20,10 @@
 #include "../src/monitor/sdb/sdb.h"
 
 word_t expr(char *e, bool *success);
+static iringbuf irb;
+void init_iringbuf(iringbuf *irb);
+void irb_write_inst(iringbuf *irb, word_t inst);
+void irb_dump(iringbuf *irb);
 
 /* The assembly code of instructions executed is only output to the screen
  * when the number of instructions executed is less than this value.
@@ -82,8 +86,10 @@ static void exec_once(Decode *s, vaddr_t pc) {
 
 static void execute(uint64_t n) {
   Decode s;
+  init_iringbuf(&irb);
   for (;n > 0; n --) {//执行n条指令
     exec_once(&s, cpu.pc);//执行一条指令
+    irb_write_inst(&irb, s.isa.inst);//写入iringbuf
     g_nr_guest_inst ++;//指令计数器++
     trace_and_difftest(&s, cpu.pc);//处理跟踪和差分测试
     if (nemu_state.state != NEMU_RUNNING) break;//如果状态为停止：停止
@@ -103,6 +109,7 @@ static void statistic() {
 
 void assert_fail_msg() {
   isa_reg_display();
+  irb_dump(&irb);
   statistic();
 }
 
@@ -127,6 +134,9 @@ void cpu_exec(uint64_t n) {
     case NEMU_RUNNING: nemu_state.state = NEMU_STOP; break;
 
     case NEMU_END: case NEMU_ABORT:
+      if(nemu_state.halt_ret != 0 || nemu_state.state == NEMU_ABORT){
+        irb_dump(&irb);
+      }
       Log("nemu: %s at pc = " FMT_WORD,
           (nemu_state.state == NEMU_ABORT ? ANSI_FMT("ABORT", ANSI_FG_RED) :
            (nemu_state.halt_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) :
@@ -134,5 +144,40 @@ void cpu_exec(uint64_t n) {
           nemu_state.halt_pc);
       // fall through
     case NEMU_QUIT: statistic();
+  }
+}
+
+/***********************iringbuf***********************/
+
+void init_iringbuf(iringbuf *irb){
+  irb->write_pos = 0;
+  irb->read_pos = 0;
+  irb->cnt = 0;
+  irb->overwrite = 0;
+}
+
+void irb_write_inst(iringbuf *irb, word_t inst) {
+  irb->buf[irb->write_pos] = inst;
+  
+  irb->write_pos = (irb->write_pos + 1) % BUFFER_SIZE;
+  
+  if (irb->cnt < BUFFER_SIZE) {
+    irb->cnt++;
+  } else {
+    irb->read_pos = (irb->read_pos + 1) % BUFFER_SIZE;
+    irb->overwrite++;
+  }
+}
+
+void irb_dump(iringbuf *irb) {
+  printf("===== iringbuf =====\n");
+  printf("Current instructions: %d\n", irb->cnt - 1);
+  printf("Overwritten instructions: %d\n", irb->overwrite);
+  printf("----------------------------\n");
+
+  int pos = irb->read_pos;
+  for (int i = 0; i < irb->cnt; i++) {
+    printf("%02d: 0x%08x\n", i, irb->buf[pos]);
+    pos = (pos + 1) % BUFFER_SIZE;
   }
 }

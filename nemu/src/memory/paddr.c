@@ -51,6 +51,9 @@ void init_mem() {
 }
 
 word_t paddr_read(paddr_t addr, int len) {//读取客户机内存数据
+  #ifdef CONFIG_MTRACE
+  printf("pc: 0x%x R: 0x%x %d\n",cpu.pc, addr, len);
+  #endif
   if (likely(in_pmem(addr))) return pmem_read(addr, len);//如果在内存范围内 返回读取结果
   IFDEF(CONFIG_DEVICE, return mmio_read(addr, len));
   out_of_bound(addr);
@@ -58,6 +61,9 @@ word_t paddr_read(paddr_t addr, int len) {//读取客户机内存数据
 }
 
 void paddr_write(paddr_t addr, int len, word_t data) {//写入客户机内存数据
+  #ifdef CONFIG_MTRACE
+  printf("pc: 0x%x W: 0x%x %d 0x%x\n",cpu.pc, addr, len, data);
+  #endif
   if (likely(in_pmem(addr))) { pmem_write(addr, len, data); return; }
   IFDEF(CONFIG_DEVICE, mmio_write(addr, len, data); return);
   out_of_bound(addr);

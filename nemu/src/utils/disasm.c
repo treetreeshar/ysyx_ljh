@@ -16,6 +16,7 @@
 #include <dlfcn.h>
 #include <capstone/capstone.h>
 #include <common.h>
+#include <isa.h>
 
 #if defined(__APPLE__)
 #define CS_LIB_SUFFIX "5.dylib"
@@ -24,7 +25,7 @@
 #else
 #error "Unsupported platform"
 #endif
-
+int cnt = 0;
 static size_t (*cs_disasm_dl)(csh handle, const uint8_t *code,
     size_t code_size, uint64_t address, size_t count, cs_insn **insn);
 static void (*cs_free_dl)(cs_insn *insn, size_t count);
@@ -76,4 +77,47 @@ void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte) {
     snprintf(str + ret, size - ret, "\t%s", insn->op_str);
   }
   cs_free_dl(insn, count);
+#ifdef CONFIG_FTRACE
+//ret == jalr x0, ra, 0
+  
+  if(strcmp(insn->mnemonic, "jal") == 0 || strcmp(insn->mnemonic, "jalr") == 0 || strcmp(insn->mnemonic, "ret") == 0){
+    printf("0x%08lx: ", pc);
+
+    int print_cnt = (strcmp(insn->mnemonic, "ret") == 0) ? cnt-1 : cnt;
+    for(int j = 0; j < print_cnt; j++){
+        printf(" ");
+    }
+
+    if(strcmp(insn->mnemonic, "jal") == 0){
+      cnt++;
+      long int call = pc + strtol(insn->op_str,NULL, 0);
+      for(int i = 0; i < func_count; i++){
+        if(call >= func_symbols[i].addr && call < func_symbols[i].addr + func_symbols[i].size){
+          printf("call [%s@0x%08lx]\n", func_symbols[i].name, call);
+          break;  
+        }
+      }
+    }
+    else if(strcmp(insn->mnemonic, "ret") == 0){
+      cnt--;
+      for(int i = 0; i < func_count; i++){
+        if(pc >= func_symbols[i].addr && pc < func_symbols[i].addr + func_symbols[i].size){
+          printf("ret  [%s]\n", func_symbols[i].name);
+          break;  
+        }
+      }
+    }
+    else{
+      cnt++;
+      for(int i = 0; i < func_count; i++){
+        bool success = false;
+        long int jpc = isa_reg_str2val(insn->op_str, &success);
+        if(jpc >= func_symbols[i].addr && jpc < func_symbols[i].addr + func_symbols[i].size){
+          printf("call [%s@0x%08lx]\n", func_symbols[i].name, jpc);
+          break;  
+        }
+      }
+    }
+  }
+#endif
 }
