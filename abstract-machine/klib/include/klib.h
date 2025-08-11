@@ -9,7 +9,9 @@
 extern "C" {
 #endif
 
-//#define __NATIVE_USE_KLIB__
+#define __NATIVE_USE_KLIB__
+//定义->库函数链接到klib
+//不定义->库函数默认链接到glibc(正确实现的参考)
 
 // string.h
 void  *memset    (void *s, int c, size_t n);
