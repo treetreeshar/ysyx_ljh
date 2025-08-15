@@ -1,6 +1,6 @@
 TOPNAME = top
 VERILATOR = verilator
-INC_PATH ?=  # 可添加自定义头文件路径
+INC_PATH ?=  #可添加自定义头文件路径
 
 VERILATOR_CFLAGS += --cc --build --x-assign fast --x-initial fast
 #VERILATOR_CFLAGS += -O3 --noassert
@@ -9,8 +9,8 @@ BUILD_DIR = ./build
 OBJ_DIR = $(BUILD_DIR)/obj_dir
 BIN = $(BUILD_DIR)/$(TOPNAME)
 
-# 默认HEX文件路径
-HEX_FILE ?= ./logisim-bin/sum.hex
+#默认HEX文件路径
+HEX_FILE ?= ./logisim-bin/mem.hex
 BASE_ADDR ?= 0x00000000
 
 default: $(BIN)
@@ -33,15 +33,10 @@ $(BIN): $(VSRCS) $(CSRCS)
 run: $(BIN)
 	@$< $(HEX_FILE) $(BASE_ADDR)
 
-# 添加一个更方便的运行目标
-run-hex: $(BIN)
-	@echo "Running simulation with HEX file: $(HEX_FILE)"
-	@$< $(HEX_FILE) $(BASE_ADDR)
-
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: default run clean run-hex
+.PHONY: default run clean
 
 sim:
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!

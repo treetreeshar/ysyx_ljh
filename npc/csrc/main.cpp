@@ -4,36 +4,29 @@
 #include <cstdint>
 #include <map>
 #include <fstream>
-#include <vector>
-#include <cstring>
+//#include <cstring>
 #include <cstdlib>
 #include <sstream>
 //#include "verilated_vcd_c.h"
 
-// 全局仿真对象
 static Vtop dut;
-static vluint64_t cycle_count = 0;  // 全局周期计数
+static vluint64_t cycle_count = 0;
 bool simulation_finished = false;
 std::map<uint32_t, uint32_t> memory;
-//static VerilatedVcdC* tfp;  // 全局波形对象
+//static VerilatedVcdC* tfp;
 
-// DPI-C 函数实现
 extern "C" void npc_ebreak() {
     simulation_finished = true;
 }
 
 extern "C" int pmem_read(int raddr) {
-    uint32_t aligned_addr = raddr & ~0x3u;
-    return memory[aligned_addr]; // 返回对齐的4字节数据
+    uint32_t aligned_addr = raddr & ~0x3u;//~0x3u = 111...11100 使地址向下对齐4字节
+    return memory[aligned_addr];
 }
 
 extern "C" void pmem_write(int waddr, int wdata, char wmask) {
     uint32_t aligned_addr = waddr & ~0x3u;
-    uint32_t& mem_word = memory[aligned_addr];
-    
-    if (memory.find(aligned_addr) == memory.end()) {
-        mem_word = 0;
-    }
+    uint32_t& mem_word = memory[aligned_addr]; //&：定义一个引用（别名）此地址的值
     
     for (int i = 0; i < 4; i++) {
         if (wmask & (1 << i)) {
@@ -43,12 +36,8 @@ extern "C" void pmem_write(int waddr, int wdata, char wmask) {
     }
 }
 
-// 加载 HEX 文件到内存
+
 void load_custom_hex(const std::string& filename, uint32_t base_address) {
-    const uint32_t MEM_SIZE = 0x100000; // 例如1MB内存
-    for (uint32_t addr = 0; addr < MEM_SIZE; addr += 4) {
-        memory[addr] = 0x00000000;
-    }//
     
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -59,29 +48,28 @@ void load_custom_hex(const std::string& filename, uint32_t base_address) {
     std::string line;
     size_t total_words = 0;
     
-    // 跳过可能的文件头
-    std::getline(file, line); // 跳过 "v3.0 hex words addressed" 行
+    std::getline(file, line);//跳过首行
     
-    while (std::getline(file, line)) {
-        // 移除可能的回车符
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
+    while (std::getline(file, line)) {//getline自动丢弃\n
+        //移除可能的windows回车符
+        if (!line.empty() && line.back() == '\r') {//非空 && 最后一个字符是换行符
+            line.pop_back();//删除字符串最后一个字符
         }
         
-        // 分割地址和数据部分
+        //分割地址和数据部分
         size_t colon_pos = line.find(':');
-        if (colon_pos == std::string::npos) continue;
+        if (colon_pos == std::string::npos) continue;//无冒号：跳过当前行
         
-        // 解析行地址
-        uint32_t line_addr = std::stoul(line.substr(0, colon_pos), nullptr, 16);
-        uint32_t full_addr = base_address + line_addr * 4; // 每行地址代表4字节的倍数
+        //解析行地址
+        uint32_t line_addr = std::stoul(line.substr(0, colon_pos), nullptr, 16);//提取行头地址
+        uint32_t full_addr = base_address + line_addr * 4;//实际地址
         
-        // 分割数据部分
+        //分割数据部分
         std::string data_str = line.substr(colon_pos + 1);
-        std::istringstream iss(data_str);
+        std::istringstream iss(data_str);//定义输入字符串流类 iss
         std::string word_str;
         
-        while (iss >> word_str) {
+        while (iss >> word_str) {//从流中提取以空格分隔的子字符串
             uint32_t word = std::stoul(word_str, nullptr, 16);
             memory[full_addr] = word;
             full_addr += 4;
@@ -111,11 +99,6 @@ static void reset(int n) {
 int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <program.hex> [base_address]\n";
-        return 1;
-    }
-    
     const char* program_path = argv[1];
     uint32_t base_address = 0x00000000; // 默认基地址
     
@@ -143,21 +126,21 @@ int main(int argc, char** argv) {
 
     while (turn < 7000 && !Verilated::gotFinish() && !simulation_finished) { //
         uint32_t current_pc = dut.pc;
-    uint32_t current_inst = pmem_read(current_pc);
-    
-    dut.inst = current_inst;
-    
-    single_cycle();
-    turn++;
-    
-    if (cycle_count % 2 == 0) {
-        std::cout << "Cycle " << cycle_count/2 
-                  << ": PC=0x" << std::hex << current_pc
-                  << " Inst=0x" << current_inst
-                  << " x10=0x" << dut.debug_x4
-                  << " x11=0x" <<dut.debug_x10
-                  << std::dec << std::endl;
-        }
+        uint32_t current_inst = dut.inst;//pmem_read(current_pc)
+        
+        //dut.inst = current_inst;
+        
+        single_cycle();
+        turn++;
+        
+        if (cycle_count % 2 == 0) {
+            std::cout << "Cycle " << cycle_count/2 
+                    << ": PC=0x" << std::hex << current_pc
+                    << " Inst=0x" << current_inst
+                    << " x10=0x" << dut.debug_x4
+                    << " x11=0x" <<dut.debug_x10
+                    << std::dec << std::endl;
+            }
     }
     
     // 清理
