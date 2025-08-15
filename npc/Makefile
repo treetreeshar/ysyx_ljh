@@ -9,6 +9,10 @@ BUILD_DIR = ./build
 OBJ_DIR = $(BUILD_DIR)/obj_dir
 BIN = $(BUILD_DIR)/$(TOPNAME)
 
+# 默认HEX文件路径
+HEX_FILE ?= ./logisim-bin/sum.hex
+BASE_ADDR ?= 0x00000000
+
 default: $(BIN)
 
 $(shell mkdir -p $(BUILD_DIR))
@@ -27,12 +31,17 @@ $(BIN): $(VSRCS) $(CSRCS)
 		--Mdir $(OBJ_DIR) --exe -o $(abspath $(BIN))
 
 run: $(BIN)
-	@$<
+	@$< $(HEX_FILE) $(BASE_ADDR)
+
+# 添加一个更方便的运行目标
+run-hex: $(BIN)
+	@echo "Running simulation with HEX file: $(HEX_FILE)"
+	@$< $(HEX_FILE) $(BASE_ADDR)
 
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: default run clean
+.PHONY: default run clean run-hex
 
 sim:
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
