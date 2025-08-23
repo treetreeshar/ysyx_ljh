@@ -9,7 +9,7 @@ module ifu(
 );
 always@(posedge clk) begin
     if(rst) begin
-        pc <= 32'h0;//80000000
+        pc <= 32'h80000000;//0
     end
     else begin
         if(jump) pc <= jump_pc;
@@ -151,7 +151,7 @@ module rf(
 reg [31:0] rf [0:31];
 
 assign debug_x4 = rf[10];
-assign debug_x10 = rf[11];
+assign debug_x10 = rf[1];
 
 wire [7:0] mem_rdatas = (sel == 2'd0) ? mem_rdata[7:0] :
                         (sel == 2'd1) ? mem_rdata[15:8] :

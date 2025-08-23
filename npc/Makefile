@@ -10,8 +10,8 @@ OBJ_DIR = $(BUILD_DIR)/obj_dir
 BIN = $(BUILD_DIR)/$(TOPNAME)
 
 #默认HEX文件路径
-HEX_FILE ?= ./logisim-bin/mem.hex
-BASE_ADDR ?= 0x00000000
+FILE ?= ./logisim-bin/dummy-minirv-npc.bin
+BASE_ADDR ?= 0x80000000
 
 default: $(BIN)
 
@@ -31,7 +31,7 @@ $(BIN): $(VSRCS) $(CSRCS)
 		--Mdir $(OBJ_DIR) --exe -o $(abspath $(BIN))
 
 run: $(BIN)
-	@$< $(HEX_FILE) $(BASE_ADDR)
+	@$< $(FILE) $(BASE_ADDR)
 
 clean:
 	rm -rf $(BUILD_DIR)

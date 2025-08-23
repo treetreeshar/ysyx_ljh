@@ -1,11 +1,17 @@
 #include <am.h>
 #include <nemu.h>
+#include <stdio.h>
 
 void __am_timer_init() {
 }
 
 void __am_timer_uptime(AM_TIMER_UPTIME_T *uptime) {
-  uptime->us = 0;
+  uint32_t hi, lo;
+  do {
+    lo = inl(0xa0000048);
+    hi = inl(0xa000004C);
+  } while (hi != inl(0xa000004C));//防止还在读取过程中就进位了
+  uptime->us = ((uint64_t)hi << 32) | lo;
 }
 
 void __am_timer_rtc(AM_TIMER_RTC_T *rtc) {

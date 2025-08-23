@@ -56,8 +56,10 @@ word_t map_read(paddr_t addr, int len, IOMap *map) {
   assert(len >= 1 && len <= 8);
   check_bound(map, addr);
   paddr_t offset = addr - map->low;
+  //printf("MMIO Read Attempt: %s @0x%08x (offset=0x%x), len=%d\n", map->name, addr, offset, len);
   invoke_callback(map->callback, offset, len, false); // prepare data to read
   word_t ret = host_read(map->space + offset, len);
+  //printf("MMIO Read Done: %s @0x%08x, len=%d, value=0x%x\n", map->name, addr, len, ret);
   return ret;
 }
 
@@ -65,6 +67,9 @@ void map_write(paddr_t addr, int len, word_t data, IOMap *map) {
   assert(len >= 1 && len <= 8);
   check_bound(map, addr);
   paddr_t offset = addr - map->low;
+  //printf("MMIO Write Attempt: %s @0x%08x (offset=0x%x), len=%d, data=0x%x\n", map->name, addr, offset, len, data);
   host_write(map->space + offset, len, data);
+  //printf("MMIO Write Done: %s @0x%08x, len=%d, data=0x%x\n", map->name, addr, len, data);
   invoke_callback(map->callback, offset, len, true);
+  //printf("MMIO Callback: %s @0x%08x, len=%d, data=0x%x (post-write)\n", map->name, addr, len, data);
 }

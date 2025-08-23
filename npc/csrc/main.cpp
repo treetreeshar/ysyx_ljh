@@ -36,6 +36,38 @@ extern "C" void pmem_write(int waddr, int wdata, char wmask) {
     }
 }
 
+void load_bin(const std::string& filename, uint32_t base_address) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+        exit(1);
+    }
+
+    // 获取文件大小
+    file.seekg(0, std::ios::end);
+    size_t size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    // 按4字节对齐读取
+    size_t total_words = (size + 3) / 4; // 向上取整
+    std::vector<uint8_t> buffer(total_words * 4, 0); // 填充0保证对齐
+
+    file.read(reinterpret_cast<char*>(buffer.data()), size);
+    file.close();
+
+    // 写入内存（按小端序解析）
+    for (size_t i = 0; i < total_words; i++) {
+        uint32_t word = 0;
+        for (int j = 0; j < 4; j++) {
+            word |= buffer[i * 4 + j] << (8 * j);
+        }
+        memory[base_address + i * 4] = word;
+    }
+
+    std::cout << "Loaded " << total_words << " words ("
+              << total_words * 4 << " bytes) from " << filename 
+              << " starting from 0x" << std::hex << base_address << std::dec << std::endl;
+}
 
 void load_custom_hex(const std::string& filename, uint32_t base_address) {
     
@@ -100,7 +132,7 @@ int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     
     const char* program_path = argv[1];
-    uint32_t base_address = 0x00000000; // 默认基地址
+    uint32_t base_address = 0x80000000; // 默认基地址
     
     if (argc >= 3) {
         char* end;
@@ -111,8 +143,16 @@ int main(int argc, char** argv) {
         }
     }
 
-    // 加载HEX文件
-    load_custom_hex(program_path, base_address);
+    // 根据文件扩展名选择加载方式
+    std::string filename(program_path);
+    if (filename.size() >= 4 && filename.substr(filename.size() - 4) == ".hex") {
+        load_custom_hex(program_path, base_address);
+    } else if (filename.size() >= 4 && filename.substr(filename.size() - 4) == ".bin") {
+        load_bin(program_path, base_address);
+    } else {
+        std::cerr << "Error: Unsupported file format (must be .hex or .bin)" << std::endl;
+        return 1;
+    }
 
     // 初始化波形
     //Verilated::traceEverOn(true);
@@ -126,14 +166,12 @@ int main(int argc, char** argv) {
 
     while (turn < 7000 && !Verilated::gotFinish() && !simulation_finished) { //
         uint32_t current_pc = dut.pc;
-        uint32_t current_inst = dut.inst;//pmem_read(current_pc)
-        
-        //dut.inst = current_inst;
+        uint32_t current_inst = dut.inst;
         
         single_cycle();
         turn++;
-        
-        if (cycle_count % 2 == 0) {
+        /**/
+        if (cycle_count % 2000 == 0) {
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << current_pc
                     << " Inst=0x" << current_inst
@@ -141,6 +179,20 @@ int main(int argc, char** argv) {
                     << " x11=0x" <<dut.debug_x10
                     << std::dec << std::endl;
             }
+        
+        // 检查当前指令是否为 ebreak
+        bool is_ebreak = (current_inst == 0x00100073);
+        if (is_ebreak) {
+            // 获取 a0 寄存器的值（RISC-V x10）
+            uint32_t a0 = dut.debug_x4; 
+            
+            // 输出程序状态
+            printf("%s\n", (a0 == 0) ? "HIT GOOD TRAP" : "HIT BAD TRAP");
+            
+            // 停止仿真
+            simulation_finished = true;
+            break;
+        }
     }
     
     // 清理
