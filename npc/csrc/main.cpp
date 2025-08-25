@@ -164,30 +164,30 @@ int main(int argc, char** argv) {
     reset(4);
     int turn = 0;
 
-    while (turn < 7000 && !Verilated::gotFinish() && !simulation_finished) { //
+    while (!Verilated::gotFinish() && !simulation_finished) { //turn < 7000 && 
         uint32_t current_pc = dut.pc;
         uint32_t current_inst = dut.inst;
         
         single_cycle();
         turn++;
-        /**/
-        if (cycle_count % 2000 == 0) {
+        /*
+        if (cycle_count % 2000 == 0) { //&& cycle_count > 12400
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << current_pc
                     << " Inst=0x" << current_inst
-                    << " x10=0x" << dut.debug_x4
-                    << " x11=0x" <<dut.debug_x10
+                    << " x4=0x" << dut.debug_x4
+                    << " x10=0x" <<dut.debug_x10
                     << std::dec << std::endl;
             }
-        
+        */
         // 检查当前指令是否为 ebreak
         bool is_ebreak = (current_inst == 0x00100073);
         if (is_ebreak) {
             // 获取 a0 寄存器的值（RISC-V x10）
-            uint32_t a0 = dut.debug_x4; 
+            uint32_t a0 = dut.debug_x10; 
             
             // 输出程序状态
-            printf("%s\n", (a0 == 0) ? "HIT GOOD TRAP" : "HIT BAD TRAP");
+            printf("%s\n", (a0 == 0) ? "\n*****HIT GOOD TRAP*****\n" : "\n*****HIT BAD TRAP*****\n");
             
             // 停止仿真
             simulation_finished = true;

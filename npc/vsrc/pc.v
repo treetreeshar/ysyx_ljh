@@ -94,14 +94,14 @@ module exu(
     input [31:0] reg_rdata1,reg_rdata2,imm,
     output mem_ren,mem_wen,reg_wen,reg_men,
     output [31:0] reg_wdata,mem_wdata,
-    output [23:0] mem_addr,
+    output [29:0] mem_addr,
     output [3:0] mem_mask, 
     output [1:0] sel,
 
     output [31:0] jump_pc,
     output jump
 );
-assign jump_pc = is_jalr ? (reg_rdata1 + imm) & ~32'b1 : 32'b0;
+assign jump_pc = is_jalr ? (reg_rdata1 + imm) & 32'hFFFFFFFE : 32'b0;
 assign jump = is_jalr;
 
 assign reg_wen = is_add || is_addi || is_jalr || is_lui;
@@ -112,12 +112,12 @@ assign mem_wen = (is_sw || is_sb) ? 1 : 0;
 
 assign sel = {reg_rdata1 + imm}[1:0];
 
-assign mem_addr = (mem_ren || mem_wen) ? {reg_rdata1 + imm}[25:2] : 24'b0;
+assign mem_addr = (mem_ren || mem_wen) ? {reg_rdata1 + imm}[31:2] : 30'b0;
 assign mem_mask = (is_sb) ? (4'b0001 << sel):
                     (is_sw) ? 4'b1111 :
                     4'b0;
 
-assign reg_wdata = (is_jalr) ? pc + 4 : 
+assign reg_wdata = (is_jalr) ? pc + 32'h4 : 
                     (is_addi) ? reg_rdata1 + imm :
                     (is_add) ? reg_rdata1 + reg_rdata2 :
                     (is_lui) ? imm :
@@ -150,8 +150,8 @@ module rf(
 );
 reg [31:0] rf [0:31];
 
-assign debug_x4 = rf[10];
-assign debug_x10 = rf[1];
+assign debug_x4 = rf[4];
+assign debug_x10 = rf[10];
 
 wire [7:0] mem_rdatas = (sel == 2'd0) ? mem_rdata[7:0] :
                         (sel == 2'd1) ? mem_rdata[15:8] :

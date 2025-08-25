@@ -27,7 +27,7 @@ module top(
     wire [31:0] reg_rdata1, reg_rdata2;
     wire mem_ren, mem_wen, reg_wen, reg_men;
     wire [31:0] reg_wdata, mem_wdata;
-    wire [23:0] mem_addr;
+    wire [29:0] mem_addr;
     wire [3:0] mem_mask;
     wire [1:0] sel;
     
@@ -40,21 +40,13 @@ module top(
     import "DPI-C" function void pmem_write(input int waddr, input int wdata, input byte wmask);
     
     // 取指
-    /*
-    reg [31:0] inst_reg;
-    always @(posedge clk) begin
-        if (rst) inst_reg <= 32'h0;
-        else inst_reg <= pmem_read(pc);
-    end
-    assign inst = (rst) ? 32'h0 : inst_reg;
-    */
-    assign inst = pmem_read(pc);   
+    assign inst = pmem_read(pc);
 
     // 内存访问
-    assign mem_rdata = pmem_read({6'b0, mem_addr, 2'b0});
-    always @(*) begin
+    assign mem_rdata = pmem_read({mem_addr, 2'b0});
+    always @(posedge clk) begin
         if (mem_wen) begin
-            pmem_write({6'b0, mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
+            pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
         end
     end
     
