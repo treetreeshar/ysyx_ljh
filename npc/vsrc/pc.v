@@ -150,7 +150,7 @@ module rf(
 );
 reg [31:0] rf [0:31];
 
-assign debug_x4 = rf[4];
+assign debug_x4 = rf[5];
 assign debug_x10 = rf[10];
 
 wire [7:0] mem_rdatas = (sel == 2'd0) ? mem_rdata[7:0] :

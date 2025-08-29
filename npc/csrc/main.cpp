@@ -4,16 +4,27 @@
 #include <cstdint>
 #include <map>
 #include <fstream>
-//#include <cstring>
 #include <cstdlib>
 #include <sstream>
+#include <time.h>
+#include <sys/time.h>
 //#include "verilated_vcd_c.h"
+
+#define SERIAL_PORT 0xa00003f8 //abstract-machine/am/src/riscv/npc/trm.c
+#define RTC_ADDR    0xa0000048 //abstract-machine/am/src/riscv/npc/timer.c
 
 static Vtop dut;
 static vluint64_t cycle_count = 0;
 bool simulation_finished = false;
 std::map<uint32_t, uint32_t> memory;
+static uint64_t start_time_us = 0;
 //static VerilatedVcdC* tfp;
+
+static uint64_t get_current_time_us() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint64_t)tv.tv_sec * 1000000 + tv.tv_usec;//返回微秒数
+}
 
 extern "C" void npc_ebreak() {
     simulation_finished = true;
@@ -21,17 +32,39 @@ extern "C" void npc_ebreak() {
 
 extern "C" int pmem_read(int raddr) {
     uint32_t aligned_addr = raddr & ~0x3u;//~0x3u = 111...11100 使地址向下对齐4字节
-    return memory[aligned_addr];
+    if (aligned_addr == 0xa0000048) { // RTC低32位
+        uint64_t time_us = get_current_time_us();
+        uint64_t elapsed_us = time_us - start_time_us;//减去开始时间 返回系统启动后的相对时间
+        return elapsed_us & 0xFFFFFFFF;
+    }
+    else if (aligned_addr == 0xa000004C) { // RTC高32位
+        uint64_t time_us = get_current_time_us();
+        uint64_t elapsed_us = time_us - start_time_us;
+        return (elapsed_us >> 32) & 0xFFFFFFFF;
+    }
+    else{
+        return memory[aligned_addr];
+    }
 }
 
 extern "C" void pmem_write(int waddr, int wdata, char wmask) {
     uint32_t aligned_addr = waddr & ~0x3u;
-    uint32_t& mem_word = memory[aligned_addr]; //&：定义一个引用（别名）此地址的值
-    
-    for (int i = 0; i < 4; i++) {
-        if (wmask & (1 << i)) {
-            uint8_t byte = (wdata >> (8 * i)) & 0xFF;
-            mem_word = (mem_word & ~(0xFF << (8 * i))) | (byte << (8 * i));
+
+    if (aligned_addr == SERIAL_PORT) {
+        if (wmask & 0x1) {
+            char c = wdata & 0xFF;
+            putchar(c);
+            fflush(stdout);//确保立即输出
+        }
+        return;
+    }
+    else {
+        uint32_t& mem_word = memory[aligned_addr]; //&：定义一个引用（别名）此地址的值
+        for (int i = 0; i < 4; i++) {
+            if (wmask & (1 << i)) {
+                uint8_t byte = (wdata >> (8 * i)) & 0xFF;
+                mem_word = (mem_word & ~(0xFF << (8 * i))) | (byte << (8 * i));
+            }
         }
     }
 }
@@ -159,8 +192,9 @@ int main(int argc, char** argv) {
     //tfp = new VerilatedVcdC;
     //dut.trace(tfp, 99);
     //tfp->open("wave.vcd");
-    
-    
+
+    start_time_us = get_current_time_us();
+
     reset(4);
     int turn = 0;
 
@@ -175,7 +209,7 @@ int main(int argc, char** argv) {
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << current_pc
                     << " Inst=0x" << current_inst
-                    << " x4=0x" << dut.debug_x4
+                    << " x5=0x" << dut.debug_x4
                     << " x10=0x" <<dut.debug_x10
                     << std::dec << std::endl;
             }
@@ -190,7 +224,7 @@ int main(int argc, char** argv) {
             printf("%s\n", (a0 == 0) ? "\n*****HIT GOOD TRAP*****\n" : "\n*****HIT BAD TRAP*****\n");
             
             // 停止仿真
-            simulation_finished = true;
+            //simulation_finished = true;
             break;
         }
     }
