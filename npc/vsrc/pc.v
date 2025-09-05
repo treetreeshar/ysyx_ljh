@@ -1,5 +1,5 @@
 /******************ifu********************/
-module ifu(
+module ysyx_25070198_ifu(
     input clk,
     input rst,
 
@@ -21,7 +21,7 @@ endmodule
 
 
 /******************idu********************/
-module idu(
+module ysyx_25070198_idu(
     input clk,
     input rst,
 
@@ -77,7 +77,7 @@ endmodule
 
 
 /******************exu********************/
-module exu(
+module ysyx_25070198_exu(
     input clk,
     input rst,
 
@@ -133,7 +133,7 @@ endmodule
 
 
 /******************reg********************/
-module rf(
+module ysyx_25070198_rf(
     input clk,
     input rst,
 

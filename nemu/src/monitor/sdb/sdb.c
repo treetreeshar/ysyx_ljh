@@ -35,7 +35,7 @@ static char* rl_gets() {
     line_read = NULL;
   }
 
-  line_read = readline("(nemu) ");
+  line_read = readline("(nemu) ");//阻塞并等待用户在终端输入，显示提示符 "(nemu) "
 
   if (line_read && *line_read) {
     add_history(line_read);
@@ -222,7 +222,7 @@ void sdb_mainloop() {
     return;
   }
 
-  for (char *str; (str = rl_gets()) != NULL; ) {//？？rl_gets返回字符串
+  for (char *str; (str = rl_gets()) != NULL; ) {//rl_gets返回字符串
     char *str_end = str + strlen(str);
 
     /* extract the first token as the command */

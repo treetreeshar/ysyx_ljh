@@ -41,6 +41,38 @@ enum {
                                 BITS(i, 30, 25) << 5 | \
                                 BITS(i, 11, 8) << 1; } while(0)
 
+static word_t csr_read(word_t csr_addr) {
+  switch (csr_addr) {
+    case 0x300: return cpu.mstatus;
+    case 0x305: return cpu.mtvec;
+    case 0x341: return cpu.mepc;
+    case 0x342: return cpu.mcause;
+    case 0x304: return cpu.mie;
+    case 0x344: return cpu.mip;
+    case 0x340: return cpu.mscratch;
+    default: 
+      printf("Unsupported CSR read: 0x%03x\n", csr_addr);
+      isa_raise_intr(EXCEPTION_ILLEGAL_INSTRUCTION, cpu.pc);
+      return 0;
+  }
+}
+
+static void csr_write(word_t csr_addr, word_t value) {
+  switch (csr_addr) {
+    case 0x300: cpu.mstatus = value; break;
+    case 0x305: cpu.mtvec = value; printf("mtvec set to 0x%08x\n", value); break;
+    case 0x341: cpu.mepc = value; break;
+    case 0x342: cpu.mcause = value; break;
+    case 0x304: cpu.mie = value; break;
+    case 0x344: cpu.mip = value; break;
+    case 0x340: cpu.mscratch = value; break;
+    default:
+      printf("Unsupported CSR write: 0x%03x\n", csr_addr);
+      isa_raise_intr(EXCEPTION_ILLEGAL_INSTRUCTION, cpu.pc);
+      break;
+  }
+}
+
 static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_t *imm, int type) {
   uint32_t i = s->isa.inst;
   int rs1 = BITS(i, 19, 15);
@@ -133,7 +165,9 @@ static int decode_exec(Decode *s) {
   //coremark
   INSTPAT("??????? ????? ????? 000 ????? 00000 11", lb     , I, R(rd) = SEXT(Mr(src1 + imm, 1), 8));
   INSTPAT("??????? ????? ????? 110 ????? 00100 11", ori    , I, R(rd) = src1 | imm);
-
+  //intr
+  INSTPAT("??????? ????? ????? ??? ????? 11100 11", ecall  , I, isa_raise_intr(11, s->pc));
+  INSTPAT("??????? ????? ????? 001 ????? 11100 11", csrrw  , I, word_t t = cpu.mtvec; cpu.mtvec = src1; R(rd) = t;);
 
   INSTPAT("0000000 00001 00000 000 00000 11100 11", ebreak , N, NEMUTRAP(s->pc, R(10))); // R(10) is $a0
   INSTPAT("??????? ????? ????? ??? ????? ????? ??", inv    , N, INV(s->pc));

@@ -14,13 +14,20 @@
 ***************************************************************************************/
 
 #include <isa.h>
+#include <stdio.h>
 
 word_t isa_raise_intr(word_t NO, vaddr_t epc) {
   /* TODO: Trigger an interrupt/exception with ``NO''.
    * Then return the address of the interrupt/exception vector.
    */
-
-  return 0;
+  cpu.mepc = epc;
+  cpu.mcause = NO;
+  if (NO == 11) {
+    cpu.mepc += 4;
+  }
+  printf("cpu.mtvec = 0x%x\n", cpu.mtvec);
+  printf("cpu.pc = 0x%x\n", cpu.pc);
+  return cpu.mtvec;
 }
 
 word_t isa_query_intr() {

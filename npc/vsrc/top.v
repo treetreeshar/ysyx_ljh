@@ -50,7 +50,7 @@ module top(
         end
     end
     
-    ifu ifu0(
+    ysyx_25070198_ifu ysyx_25070198_ifu0(
         .clk(clk),
         .rst(rst),
         .jump_pc(jump_pc),
@@ -58,7 +58,7 @@ module top(
         .pc(pc)
     );
     
-    idu idu0(
+    ysyx_25070198_idu ysyx_25070198_idu0(
         .clk(clk),
         .rst(rst),
         .inst(inst),
@@ -75,8 +75,8 @@ module top(
         .is_sw(is_sw),
         .is_sb(is_sb)
     );
-    
-    exu exu0(
+
+    ysyx_25070198_exu ysyx_25070198_exu0(
         .clk(clk),
         .rst(rst),
         .is_addi(is_addi),
@@ -103,8 +103,8 @@ module top(
         .jump_pc(jump_pc),
         .jump(jump)
     );
-    
-    rf rf0(
+
+    ysyx_25070198_rf ysyx_25070198_rf0(
         .clk(clk),
         .rst(rst),
         .reg_wdata(reg_wdata),

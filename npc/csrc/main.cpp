@@ -10,8 +10,8 @@
 #include <sys/time.h>
 //#include "verilated_vcd_c.h"
 
-#define SERIAL_PORT 0xa00003f8 //abstract-machine/am/src/riscv/npc/trm.c
-#define RTC_ADDR    0xa0000048 //abstract-machine/am/src/riscv/npc/timer.c
+#define ysyx_25070198_SERIAL_PORT 0xa00003f8 //abstract-machine/am/src/riscv/npc/trm.c
+#define ysyx_25070198_RTC_ADDR    0xa0000048 //abstract-machine/am/src/riscv/npc/timer.c
 
 static Vtop dut;
 static vluint64_t cycle_count = 0;
@@ -32,12 +32,12 @@ extern "C" void npc_ebreak() {
 
 extern "C" int pmem_read(int raddr) {
     uint32_t aligned_addr = raddr & ~0x3u;//~0x3u = 111...11100 使地址向下对齐4字节
-    if (aligned_addr == 0xa0000048) { // RTC低32位
+    if (aligned_addr == ysyx_25070198_RTC_ADDR) { // RTC低32位
         uint64_t time_us = get_current_time_us();
         uint64_t elapsed_us = time_us - start_time_us;//减去开始时间 返回系统启动后的相对时间
         return elapsed_us & 0xFFFFFFFF;
     }
-    else if (aligned_addr == 0xa000004C) { // RTC高32位
+    else if (aligned_addr == ysyx_25070198_RTC_ADDR + 4) { // RTC高32位
         uint64_t time_us = get_current_time_us();
         uint64_t elapsed_us = time_us - start_time_us;
         return (elapsed_us >> 32) & 0xFFFFFFFF;
@@ -50,7 +50,7 @@ extern "C" int pmem_read(int raddr) {
 extern "C" void pmem_write(int waddr, int wdata, char wmask) {
     uint32_t aligned_addr = waddr & ~0x3u;
 
-    if (aligned_addr == SERIAL_PORT) {
+    if (aligned_addr == ysyx_25070198_SERIAL_PORT) {
         if (wmask & 0x1) {
             char c = wdata & 0xFF;
             putchar(c);
