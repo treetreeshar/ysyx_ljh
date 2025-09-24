@@ -21,7 +21,7 @@ module top(
     //wire [31:0] inst;
     wire [4:0] rs1, rs2, rd;
     wire [31:0] imm;
-    wire is_addi, is_jalr, is_add, is_lui, is_lw, is_lbu, is_sw, is_sb;
+    wire is_addi, is_jalr, is_add, is_lui, is_lw, is_lbu, is_sw, is_sb, is_csrrw;
     
     // EXU接口
     wire [31:0] reg_rdata1, reg_rdata2;
@@ -30,6 +30,11 @@ module top(
     wire [29:0] mem_addr;
     wire [3:0] mem_mask;
     wire [1:0] sel;
+
+    // CSR接口
+    wire csr_wen;
+    wire [11:0] csr_addr;
+    wire [31:0] csr_rdata;
     
     // 内存接口
     wire [31:0] mem_rdata;
@@ -49,7 +54,7 @@ module top(
             pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
         end
     end
-    
+
     ysyx_25070198_ifu ysyx_25070198_ifu0(
         .clk(clk),
         .rst(rst),
@@ -73,7 +78,9 @@ module top(
         .is_lw(is_lw),
         .is_lbu(is_lbu),
         .is_sw(is_sw),
-        .is_sb(is_sb)
+        .is_sb(is_sb),
+        
+        .is_csrrw(is_csrrw)
     );
 
     ysyx_25070198_exu ysyx_25070198_exu0(
@@ -101,7 +108,12 @@ module top(
         .mem_mask(mem_mask),
         .sel(sel),
         .jump_pc(jump_pc),
-        .jump(jump)
+        .jump(jump),
+
+        .is_csrrw(is_csrrw),
+        .csr_rdata(csr_rdata),
+        .csr_wen(csr_wen),
+        .csr_addr(csr_addr)
     );
 
     ysyx_25070198_rf ysyx_25070198_rf0(
@@ -120,6 +132,15 @@ module top(
         .reg_rdata2(reg_rdata2),
         .debug_x4(debug_x4),
         .debug_x10(debug_x10)
+    );
+
+    ysyx_25070198_csr_reg ysyx_25070198_csr_reg0(
+        .clk(clk),
+        .rst(rst),
+        .csr_wen(csr_wen),
+        .csr_addr(csr_addr),
+        .csr_wdata(reg_rdata1),
+        .csr_rdata(csr_rdata)
     );
 
 endmodule

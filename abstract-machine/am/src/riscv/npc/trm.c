@@ -1,6 +1,7 @@
 #include <am.h>
 #include <klib-macros.h>
 #include <riscv/riscv.h> // for outb/inl
+#include <stdio.h>
 
 extern char _heap_start;
 int main(const char *args);
@@ -27,6 +28,12 @@ void halt(int code) {
 }
 
 void _trm_init() {
+  uint32_t mvendorid, marchid;
+  asm volatile ("csrrw %0, 0xF11, x0" : "=r"(mvendorid));
+  asm volatile ("csrrw %0, 0xF12, x0" : "=r"(marchid));
+  printf("mvendorid: 0x%x\n", mvendorid);
+  printf("marchid: %d\n", marchid);
+
   int ret = main(mainargs);
   halt(ret);
 }

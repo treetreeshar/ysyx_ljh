@@ -162,6 +162,12 @@ static void reset(int n) {
 }
 
 int main(int argc, char** argv) {
+    /*
+    uint32_t ysyx, stuid;
+    asm volatile ("csrrw %0, 0xF11, x0" : "=r"(ysyx));
+    asm volatile ("csrrw %0, 0xF12, x0" : "=r"(stuid));
+    printf("ysyx:%d stuid:%d\n", ysyx, stuid);
+    */
     Verilated::commandArgs(argc, argv);
     
     const char* program_path = argv[1];

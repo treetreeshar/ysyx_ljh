@@ -25,6 +25,52 @@ static void print_num(int num) {
   }
 }
 
+static void print_hex(unsigned int num) {
+  char tmp[20];
+  int tmp_pos = 0;
+  
+  // 处理0的特殊情况
+  if (num == 0) {
+    putch('0');
+    return;
+  }
+  
+  // 将数字转换为十六进制（逆序）
+  while (num > 0) {
+    int digit = num % 16;
+    tmp[tmp_pos++] = digit < 10 ? '0' + digit : 'a' + digit - 10;
+    num /= 16;
+  }
+  
+  // 逆序输出（正确的顺序）
+  while (tmp_pos > 0) {
+    putch(tmp[--tmp_pos]);
+  }
+}
+
+static int hex_to_str(char *buf, unsigned int num) {
+  int len = 0;
+  
+  if (num == 0) {
+    buf[len++] = '0';
+    return len;
+  }
+  
+  char tmp[20];
+  int tmp_pos = 0;
+  
+  while (num > 0) {
+    int digit = num % 16;
+    tmp[tmp_pos++] = digit < 10 ? '0' + digit : 'a' + digit - 10;
+    num /= 16;
+  }
+  
+  while (tmp_pos > 0) {
+    buf[len++] = tmp[--tmp_pos];
+  }
+  return len;
+}
+
 int printf(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
@@ -45,7 +91,6 @@ int printf(const char *fmt, ...) {
         case 'd': {
           int num = va_arg(args, int);
           print_num(num);
-          // 计算输出字符数（粗略估计）
           int tmp = num < 0 ? -num : num;
           do {
             chars_printed++;
@@ -53,6 +98,16 @@ int printf(const char *fmt, ...) {
           } while (tmp > 0);
           if (num < 0) chars_printed++;
             break;
+        }
+        case 'x': {
+          unsigned int num = va_arg(args, unsigned int);
+          print_hex(num);
+          unsigned int tmp = num;
+          do {
+            chars_printed++;
+            tmp /= 16;
+          } while (tmp > 0);
+          break;
         }
         default: {  // 其他格式（如 %%）
           putch(fmt[i]);
@@ -114,6 +169,11 @@ int sprintf(char *out, const char *fmt, ...) {
         case 'd': {
           int num = va_arg(args, int);
           pos += int_to_str(out + pos, num);
+          break;
+        }
+        case 'x': {
+          unsigned int num = va_arg(args, unsigned int);
+          pos += hex_to_str(out + pos, num);
           break;
         }
         default: {

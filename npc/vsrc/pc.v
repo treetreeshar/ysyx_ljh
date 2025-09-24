@@ -39,7 +39,9 @@ module ysyx_25070198_idu(
     output is_lw,
     output is_lbu,
     output is_sw,
-    output is_sb
+    output is_sb,
+    
+    output is_csrrw
 
 );
 
@@ -62,15 +64,19 @@ module ysyx_25070198_idu(
     assign is_lbu  = (opcode == 7'b0000011) && (funct3 == 3'b100);    //I
     assign is_sw   = (opcode == 7'b0100011) && (funct3 == 3'b010);    //S
     assign is_sb   = (opcode == 7'b0100011) && (funct3 == 3'b000);    //S
+
+    assign is_csrrw = (opcode == 7'b1110011) && (funct3 == 3'b001);   //I
     
     wire [31:0] i_imm = {{20{inst[31]}}, inst[31:20]};
     wire [31:0] s_imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};
     wire [31:0] u_imm = {inst[31:12], 12'b0};
     //r型无立即数 有funct7
-    
-    assign imm = (is_addi || is_jalr || is_lw || is_lbu) ? i_imm :
+    wire [31:0] csr_imm = {20'b0, inst[31:20]};
+
+    assign imm = (is_addi || is_jalr || is_lw || is_lbu ) ? i_imm :
                  (is_lui) ? u_imm :
                  (is_sw || is_sb) ? s_imm :
+                 (is_csrrw) ? csr_imm :
                  32'b0;
    
 endmodule
@@ -90,6 +96,11 @@ module ysyx_25070198_exu(
     input is_sw,
     input is_sb,
 
+    input is_csrrw,
+    input [31:0] csr_rdata,
+    output csr_wen,
+    output [11:0] csr_addr,
+
     input [31:0] pc,
     input [31:0] reg_rdata1,reg_rdata2,imm,
     output mem_ren,mem_wen,reg_wen,reg_men,
@@ -104,7 +115,7 @@ module ysyx_25070198_exu(
 assign jump_pc = is_jalr ? (reg_rdata1 + imm) & 32'hFFFFFFFE : 32'b0;
 assign jump = is_jalr;
 
-assign reg_wen = is_add || is_addi || is_jalr || is_lui;
+assign reg_wen = is_add || is_addi || is_jalr || is_lui || is_csrrw;
 assign reg_men = is_lw || is_lbu;
 
 assign mem_ren = (is_lw || is_lbu) ? 1 : 0;
@@ -121,13 +132,18 @@ assign reg_wdata = (is_jalr) ? pc + 32'h4 :
                     (is_addi) ? reg_rdata1 + imm :
                     (is_add) ? reg_rdata1 + reg_rdata2 :
                     (is_lui) ? imm :
+                    (is_csrrw) ? csr_rdata :
                     32'b0;
+
 assign mem_wdata = (is_sw) ? reg_rdata2 : 
                     (is_sb && mem_mask == 4'd1) ? {24'b0, reg_rdata2[7:0]} :
                     (is_sb && mem_mask == 4'd2) ? {16'b0, reg_rdata2[7:0], 8'b0} :
                     (is_sb && mem_mask == 4'd4) ? {8'b0, reg_rdata2[7:0], 16'b0} :
                     (is_sb && mem_mask == 4'd8) ? {reg_rdata2[7:0], 24'b0} :
                     0;
+
+assign csr_wen = is_csrrw;
+assign csr_addr = imm[11:0];
 
 endmodule
 
