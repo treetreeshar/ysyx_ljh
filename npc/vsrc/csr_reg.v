@@ -4,10 +4,12 @@ module ysyx_25070198_csr_reg (
     input csr_wen,
     input [11:0] csr_addr,
     input [31:0] csr_wdata,//rs1 reg_rdata1
-    output [31:0] csr_rdata
+    output [31:0] csr_rdata,
+    output reg [31:0] mcycle,
+    output reg [31:0] mcycleh
 );
-    reg [31:0] mcycle;
-    reg [31:0] mcycleh;
+    //reg [31:0] mcycle;
+    //reg [31:0] mcycleh;
     reg [31:0] mvendorid;
     reg [31:0] marchid;
 

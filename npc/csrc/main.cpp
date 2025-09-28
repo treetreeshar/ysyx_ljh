@@ -162,12 +162,6 @@ static void reset(int n) {
 }
 
 int main(int argc, char** argv) {
-    /*
-    uint32_t ysyx, stuid;
-    asm volatile ("csrrw %0, 0xF11, x0" : "=r"(ysyx));
-    asm volatile ("csrrw %0, 0xF12, x0" : "=r"(stuid));
-    printf("ysyx:%d stuid:%d\n", ysyx, stuid);
-    */
     Verilated::commandArgs(argc, argv);
     
     const char* program_path = argv[1];
@@ -202,7 +196,7 @@ int main(int argc, char** argv) {
     start_time_us = get_current_time_us();
 
     reset(4);
-    int turn = 0;
+    long long int turn = 0;
 
     while (!Verilated::gotFinish() && !simulation_finished) { //turn < 7000 && 
         uint32_t current_pc = dut.pc;
@@ -225,9 +219,13 @@ int main(int argc, char** argv) {
         if (is_ebreak) {
             // 获取 a0 寄存器的值（RISC-V x10）
             uint32_t a0 = dut.debug_x10; 
+            uint32_t mcycle = dut.mcycle;
+            uint32_t mcycleh = dut.mcycleh;
             
             // 输出程序状态
-            printf("%s\n", (a0 == 0) ? "\n*****HIT GOOD TRAP*****\n" : "\n*****HIT BAD TRAP*****\n");
+            printf("\nmcycle: %lu\n", (uint64_t)mcycleh << 32 | mcycle);
+            printf("turn   : %d\n", turn);
+            printf("%s\n", (a0 == 0) ? "*****HIT GOOD TRAP*****\n" : "*****HIT BAD TRAP*****\n");
             
             // 停止仿真
             //simulation_finished = true;

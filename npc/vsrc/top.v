@@ -3,7 +3,8 @@ module top(
     input rst,
 
     output [31:0] pc,inst,
-    output [31:0] debug_x4,debug_x10
+    output [31:0] debug_x4,debug_x10,
+    output [31:0] mcycle,mcycleh
 );
 
     always @(posedge clk) begin
@@ -140,7 +141,9 @@ module top(
         .csr_wen(csr_wen),
         .csr_addr(csr_addr),
         .csr_wdata(reg_rdata1),
-        .csr_rdata(csr_rdata)
+        .csr_rdata(csr_rdata),
+        .mcycle(mcycle),
+        .mcycleh(mcycleh)
     );
 
 endmodule
