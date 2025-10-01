@@ -8,7 +8,7 @@ module top(
 );
 
     always @(posedge clk) begin
-        if (!rst && inst == 32'h00100073) begin
+        if (!rst && inst_valid && inst == 32'h00100073) begin
             npc_ebreak();
         end
     end
@@ -17,6 +17,7 @@ module top(
     //wire [31:0] pc;
     wire [31:0] jump_pc;
     wire jump;
+    wire inst_valid;
     
     // IDU接口
     //wire [31:0] inst;
@@ -44,14 +45,21 @@ module top(
     import "DPI-C" function void npc_ebreak();
     import "DPI-C" function int pmem_read(input int raddr);
     import "DPI-C" function void pmem_write(input int waddr, input int wdata, input byte wmask);
+
+    // SimpleBus 接口
+    wire [31:0] ifu_raddr;
+    reg [31:0] ifu_rdata;
     
     // 取指
-    assign inst = pmem_read(pc);
+    //assign inst = pmem_read(pc);
+    always @(posedge clk) begin
+        ifu_rdata <= pmem_read(ifu_raddr);
+    end
 
     // 内存访问
     assign mem_rdata = pmem_read({mem_addr, 2'b0});
     always @(posedge clk) begin
-        if (mem_wen) begin
+        if (mem_wen && inst_valid) begin
             pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
         end
     end
@@ -61,7 +69,11 @@ module top(
         .rst(rst),
         .jump_pc(jump_pc),
         .jump(jump),
-        .pc(pc)
+        .pc(pc),
+        .inst(inst),
+        .inst_valid(inst_valid),
+        .ifu_rdata(ifu_rdata),
+        .ifu_raddr(ifu_raddr)
     );
     
     ysyx_25070198_idu ysyx_25070198_idu0(
@@ -110,6 +122,8 @@ module top(
         .sel(sel),
         .jump_pc(jump_pc),
         .jump(jump),
+
+        .inst_valid(inst_valid),
 
         .is_csrrw(is_csrrw),
         .csr_rdata(csr_rdata),

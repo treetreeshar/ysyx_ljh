@@ -8,7 +8,7 @@
 #include <sstream>
 #include <time.h>
 #include <sys/time.h>
-//#include "verilated_vcd_c.h"
+#include "verilated_vcd_c.h"
 
 #define ysyx_25070198_SERIAL_PORT 0xa00003f8 //abstract-machine/am/src/riscv/npc/trm.c
 #define ysyx_25070198_RTC_ADDR    0xa0000048 //abstract-machine/am/src/riscv/npc/timer.c
@@ -18,7 +18,7 @@ static vluint64_t cycle_count = 0;
 bool simulation_finished = false;
 std::map<uint32_t, uint32_t> memory;
 static uint64_t start_time_us = 0;
-//static VerilatedVcdC* tfp;
+static VerilatedVcdC* tfp;
 
 static uint64_t get_current_time_us() {
     struct timeval tv;
@@ -149,9 +149,9 @@ void load_custom_hex(const std::string& filename, uint32_t base_address) {
 
 static void single_cycle() {
     dut.clk = 0; dut.eval();
-    //if (tfp) tfp->dump(cycle_count);  // 记录下降沿
+    if (tfp) tfp->dump(cycle_count);  // 记录下降沿
     dut.clk = 1; dut.eval();
-    //if (tfp) tfp->dump(cycle_count + 1);  // 记录上升沿
+    if (tfp) tfp->dump(cycle_count + 1);  // 记录上升沿
     cycle_count += 2;
 }
 
@@ -188,24 +188,24 @@ int main(int argc, char** argv) {
     }
 
     // 初始化波形
-    //Verilated::traceEverOn(true);
-    //tfp = new VerilatedVcdC;
-    //dut.trace(tfp, 99);
-    //tfp->open("wave.vcd");
+    Verilated::traceEverOn(true);
+    tfp = new VerilatedVcdC;
+    dut.trace(tfp, 99);
+    tfp->open("wave.vcd");
 
     start_time_us = get_current_time_us();
 
     reset(4);
     long long int turn = 0;
 
-    while (!Verilated::gotFinish() && !simulation_finished) { //turn < 7000 && 
+    while (!Verilated::gotFinish() && turn < 100 && !simulation_finished) { //
         uint32_t current_pc = dut.pc;
         uint32_t current_inst = dut.inst;
         
         single_cycle();
         turn++;
-        /*
-        if (cycle_count % 2000 == 0) { //&& cycle_count > 12400
+        /**/
+        if (cycle_count % 4 == 0) { //&& cycle_count > 12400
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << current_pc
                     << " Inst=0x" << current_inst
@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
                     << " x10=0x" <<dut.debug_x10
                     << std::dec << std::endl;
             }
-        */
+        
         // 检查当前指令是否为 ebreak
         bool is_ebreak = (current_inst == 0x00100073);
         if (is_ebreak) {
@@ -223,8 +223,8 @@ int main(int argc, char** argv) {
             uint32_t mcycleh = dut.mcycleh;
             
             // 输出程序状态
-            printf("\nmcycle: %lu\n", (uint64_t)mcycleh << 32 | mcycle);
-            printf("turn   : %d\n", turn);
+            //printf("\nmcycle: %lu\n", (uint64_t)mcycleh << 32 | mcycle);
+            //printf("turn   : %lld\n", turn);
             printf("%s\n", (a0 == 0) ? "*****HIT GOOD TRAP*****\n" : "*****HIT BAD TRAP*****\n");
             
             // 停止仿真
@@ -234,10 +234,10 @@ int main(int argc, char** argv) {
     }
     
     // 清理
-    //if (tfp) {
-    //    tfp->close();
-    //    delete tfp;
-    //}
+    if (tfp) {
+        tfp->close();
+        delete tfp;
+    }
     dut.final();
     return 0;
 }

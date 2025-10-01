@@ -5,20 +5,84 @@ module ysyx_25070198_ifu(
 
     input [31:0] jump_pc,
     input jump,
-    output reg [31:0] pc
+    
+    //输出指令和有效信号
+    output reg [31:0] pc,
+    output reg [31:0] inst,
+    output reg inst_valid,
+    
+    //SimpleBus接口
+    output reg [31:0] ifu_raddr,
+    input [31:0] ifu_rdata
 );
-always@(posedge clk) begin
-    if(rst) begin
-        pc <= 32'h80000000;//0
+
+    //状态定义
+    typedef enum logic [1:0] {
+        IFU_IDLE = 2'b00,
+        IFU_WAIT = 2'b01
+    } ifu_state_t;
+    
+    ifu_state_t current_state, next_state;
+    
+    //PC更新逻辑
+    always @(posedge clk) begin
+        if (rst) begin
+            pc <= 32'h80000000;
+        end 
+        else if (inst_valid) begin
+            if (jump) begin
+                pc <= jump_pc;
+            end else begin
+                pc <= pc + 32'h4;
+            end
+        end
+        else begin
+            pc <= pc;//PC保持不变
+        end
     end
-    else begin
-        if(jump) pc <= jump_pc;
-        else pc <= pc + 32'h4;
+    
+    //状态转移逻辑
+    always @(posedge clk) begin
+        if (rst) begin
+            current_state <= IFU_IDLE;
+            inst <= 32'h0;
+            inst_valid <= 1'b1;
+            ifu_raddr <= 32'h80000000;
+        end else begin
+            current_state <= next_state;
+            
+            //根据状态设置输出
+            case (next_state)
+                IFU_IDLE: begin
+                    ifu_raddr <= pc;//在IDLE状态发送地址
+                    inst_valid <= 1'b1;
+                    inst <= 32'h0;//指令无效时输出0
+                end
+                IFU_WAIT: begin
+                    ifu_raddr <= pc;//保持地址
+                    inst_valid <= 1'b0;
+                    inst <= ifu_rdata;//使用存储器返回的数据
+                end
+                default: begin
+                    ifu_raddr <= 32'h0;
+                    inst_valid <= 1'b1;
+                    inst <= 32'h0;
+                end
+            endcase
+        end
     end
-end
+    
+    //下一状态逻辑
+    //always @(*) begin
+    //    case (current_state)
+    //        IFU_IDLE: next_state = IFU_WAIT;
+    //        IFU_WAIT: next_state = IFU_IDLE;
+    //        default: next_state = IFU_IDLE;
+    //    endcase
+    //end
+    assign next_state = (current_state == IFU_IDLE) ? IFU_WAIT : IFU_IDLE;
 
 endmodule
-
 
 /******************idu********************/
 module ysyx_25070198_idu(
@@ -87,6 +151,8 @@ module ysyx_25070198_exu(
     input clk,
     input rst,
 
+    input inst_valid,
+
     input is_addi,
     input is_jalr,
     input is_add,
@@ -115,11 +181,11 @@ module ysyx_25070198_exu(
 assign jump_pc = is_jalr ? (reg_rdata1 + imm) & 32'hFFFFFFFE : 32'b0;
 assign jump = is_jalr;
 
-assign reg_wen = is_add || is_addi || is_jalr || is_lui || is_csrrw;
-assign reg_men = is_lw || is_lbu;
+assign reg_wen = (is_add || is_addi || is_jalr || is_lui || is_csrrw) && inst_valid;
+assign reg_men = (is_lw || is_lbu) && inst_valid;
 
-assign mem_ren = (is_lw || is_lbu) ? 1 : 0;
-assign mem_wen = (is_sw || is_sb) ? 1 : 0;
+assign mem_ren = (is_lw || is_lbu) && inst_valid;
+assign mem_wen = (is_sw || is_sb) && inst_valid;
 
 assign sel = {reg_rdata1 + imm}[1:0];
 
@@ -142,7 +208,7 @@ assign mem_wdata = (is_sw) ? reg_rdata2 :
                     (is_sb && mem_mask == 4'd8) ? {reg_rdata2[7:0], 24'b0} :
                     0;
 
-assign csr_wen = is_csrrw;
+assign csr_wen = is_csrrw && inst_valid;
 assign csr_addr = imm[11:0];
 
 endmodule
