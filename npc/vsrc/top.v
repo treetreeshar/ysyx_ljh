@@ -60,12 +60,10 @@ module top(
     end
 
     // 内存访问
-    //assign mem_rdata = pmem_read({mem_addr, 2'b0});
-    reg [31:0] mem_rdata_reg;
-    always @(posedge clk) begin
-        mem_rdata_reg <= pmem_read({mem_addr, 2'b0});
-    end
-    assign mem_rdata = mem_rdata_reg;
+    assign mem_rdata = pmem_read({mem_addr, 2'b0});
+    //always @(posedge clk) begin
+    //    mem_rdata<= pmem_read({mem_addr, 2'b0});
+    //end
     always @(posedge clk) begin
         if (mem_wen) begin
             pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
