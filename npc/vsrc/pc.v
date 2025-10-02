@@ -52,11 +52,6 @@ module ysyx_25070198_ifu(
     
     //输出逻辑和下一状态逻辑
     always @(*) begin
-        next_state = IFU_IDLE;
-        inst_valid = 1'b0;
-        inst = 32'h0;
-        ifu_raddr = 32'h0;
-        
         case (current_state)
             IFU_IDLE: begin
                 ifu_raddr = pc;        // 在IDLE状态发送地址
