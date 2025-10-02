@@ -53,13 +53,21 @@ module top(
     // 取指
     //assign inst = pmem_read(pc);
     always @(posedge clk) begin
-        ifu_rdata <= pmem_read(ifu_raddr);
+        if(rst) 
+            ifu_rdata <= 32'b0;
+        else
+            ifu_rdata <= pmem_read(ifu_raddr);
     end
 
     // 内存访问
-    assign mem_rdata = pmem_read({mem_addr, 2'b0});
+    //assign mem_rdata = pmem_read({mem_addr, 2'b0});
+    reg [31:0] mem_rdata_reg;
     always @(posedge clk) begin
-        if (mem_wen && inst_valid) begin
+        mem_rdata_reg <= pmem_read({mem_addr, 2'b0});
+    end
+    assign mem_rdata = mem_rdata_reg;
+    always @(posedge clk) begin
+        if (mem_wen) begin
             pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
         end
     end

@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
     reset(4);
     long long int turn = 0;
 
-    while (!Verilated::gotFinish() && turn < 100 && !simulation_finished) { //
+    while (!Verilated::gotFinish() && turn < 7000 && !simulation_finished) { //
         uint32_t current_pc = dut.pc;
         uint32_t current_inst = dut.inst;
         

@@ -11,7 +11,7 @@ module ysyx_25070198_ifu(
     output reg [31:0] inst,
     output reg inst_valid,
     
-    //SimpleBus接口
+    //SimpleBus 接口
     output reg [31:0] ifu_raddr,
     input [31:0] ifu_rdata
 );
@@ -37,50 +37,47 @@ module ysyx_25070198_ifu(
             end
         end
         else begin
-            pc <= pc;//PC保持不变
+            pc <= pc;
         end
     end
     
-    //状态转移逻辑
+    //状态寄存器
     always @(posedge clk) begin
         if (rst) begin
             current_state <= IFU_IDLE;
-            inst <= 32'h0;
-            inst_valid <= 1'b1;
-            ifu_raddr <= 32'h80000000;
         end else begin
             current_state <= next_state;
-            
-            //根据状态设置输出
-            case (next_state)
-                IFU_IDLE: begin
-                    ifu_raddr <= pc;//在IDLE状态发送地址
-                    inst_valid <= 1'b1;
-                    inst <= 32'h0;//指令无效时输出0
-                end
-                IFU_WAIT: begin
-                    ifu_raddr <= pc;//保持地址
-                    inst_valid <= 1'b0;
-                    inst <= ifu_rdata;//使用存储器返回的数据
-                end
-                default: begin
-                    ifu_raddr <= 32'h0;
-                    inst_valid <= 1'b1;
-                    inst <= 32'h0;
-                end
-            endcase
         end
     end
     
-    //下一状态逻辑
-    //always @(*) begin
-    //    case (current_state)
-    //        IFU_IDLE: next_state = IFU_WAIT;
-    //        IFU_WAIT: next_state = IFU_IDLE;
-    //        default: next_state = IFU_IDLE;
-    //    endcase
-    //end
-    assign next_state = (current_state == IFU_IDLE) ? IFU_WAIT : IFU_IDLE;
+    //输出逻辑和下一状态逻辑
+    always @(*) begin
+        next_state = IFU_IDLE;
+        inst_valid = 1'b0;
+        inst = 32'h0;
+        ifu_raddr = 32'h0;
+        
+        case (current_state)
+            IFU_IDLE: begin
+                ifu_raddr = pc;        // 在IDLE状态发送地址
+                inst_valid = 1'b0;     // 指令无效
+                inst = 32'h0;          // 输出0
+                next_state = IFU_WAIT; // 下一周期进入WAIT
+            end
+            IFU_WAIT: begin
+                ifu_raddr = pc;        // 保持地址
+                inst_valid = 1'b1;     // 指令有效
+                inst = ifu_rdata;      // 使用存储器返回的数据
+                next_state = IFU_IDLE; // 下一周期回到IDLE
+            end
+            default: begin
+                ifu_raddr = 32'h0;
+                inst_valid = 1'b0;
+                inst = 32'h0;
+                next_state = IFU_IDLE;
+            end
+        endcase
+    end
 
 endmodule
 
