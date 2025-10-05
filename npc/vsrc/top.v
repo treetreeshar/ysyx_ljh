@@ -37,6 +37,15 @@ module top(
     wire csr_wen;
     wire [11:0] csr_addr;
     wire [31:0] csr_rdata;
+
+    // LSU接口
+    wire [31:0] lsu_addr;
+    wire lsu_wen;
+    wire [31:0] lsu_wdata;
+    wire [3:0] lsu_wmask;
+    reg [31:0] lsu_rdata;
+    wire mem_data_valid;
+    wire lsu_busy;
     
     // 内存接口
     wire [31:0] mem_rdata;
@@ -60,13 +69,16 @@ module top(
     end
 
     // 内存访问
-    assign mem_rdata = pmem_read({mem_addr, 2'b0});
+    //assign mem_rdata = pmem_read({mem_addr, 2'b0});
     //always @(posedge clk) begin
-    //    mem_rdata<= pmem_read({mem_addr, 2'b0});
+    //    if (mem_wen) begin
+    //        pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
+    //    end
     //end
     always @(posedge clk) begin
-        if (mem_wen) begin
-            pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
+        lsu_rdata <= (!lsu_wen) ? pmem_read(lsu_addr) : 32'b0;
+        if (lsu_wen) begin
+            pmem_write(lsu_addr, lsu_wdata, {4'b0, lsu_wmask});
         end
     end
 
@@ -78,6 +90,9 @@ module top(
         .pc(pc),
         .inst(inst),
         .inst_valid(inst_valid),
+        .mem_data_valid(mem_data_valid),
+        .mem_ren(mem_ren),  
+        .lsu_busy(lsu_busy), 
         .ifu_rdata(ifu_rdata),
         .ifu_raddr(ifu_raddr)
     );
@@ -130,6 +145,7 @@ module top(
         .jump(jump),
 
         .inst_valid(inst_valid),
+        .mem_data_valid(mem_data_valid),
 
         .is_csrrw(is_csrrw),
         .csr_rdata(csr_rdata),
@@ -164,6 +180,24 @@ module top(
         .csr_rdata(csr_rdata),
         .mcycle(mcycle),
         .mcycleh(mcycleh)
+    );
+
+    ysyx_25070198_lsu ysyx_25070198_lsu0(
+        .clk(clk),
+        .rst(rst),
+        .mem_ren(mem_ren),
+        .mem_wen(mem_wen),
+        .mem_addr({mem_addr, 2'b0}),
+        .mem_wdata(mem_wdata),
+        .mem_mask(mem_mask),
+        .mem_rdata(mem_rdata),
+        .mem_data_valid(mem_data_valid),
+        .lsu_busy(lsu_busy),
+        .lsu_addr(lsu_addr),
+        .lsu_wen(lsu_wen),
+        .lsu_wdata(lsu_wdata),
+        .lsu_wmask(lsu_wmask),
+        .lsu_rdata(lsu_rdata)
     );
 
 endmodule

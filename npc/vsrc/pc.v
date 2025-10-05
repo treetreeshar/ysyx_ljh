@@ -5,13 +5,14 @@ module ysyx_25070198_ifu(
 
     input [31:0] jump_pc,
     input jump,
+    input mem_data_valid,
+    input mem_ren,
+    input lsu_busy,
     
-    //输出指令和有效信号
     output reg [31:0] pc,
     output reg [31:0] inst,
     output reg inst_valid,
     
-    //SimpleBus 接口
     output reg [31:0] ifu_raddr,
     input [31:0] ifu_rdata
 );
@@ -19,57 +20,79 @@ module ysyx_25070198_ifu(
     //状态定义
     typedef enum logic [1:0] {
         IFU_IDLE = 2'b00,
-        IFU_WAIT = 2'b01
+        IFU_WAIT = 2'b01,
+        IFU_HOLD = 2'b10
     } ifu_state_t;
     
-    ifu_state_t current_state, next_state;
+    ifu_state_t ifu_current_state, ifu_next_state;
     
-    //PC更新逻辑
     always @(posedge clk) begin
         if (rst) begin
             pc <= 32'h80000000;
         end 
-        else if (inst_valid) begin
-            if (jump) begin
-                pc <= jump_pc;
-            end else begin
-                pc <= pc + 32'h4;
-            end
+        else if (jump) begin
+            pc <= jump_pc;
         end
-        else begin
-            pc <= pc;
+        else if (inst_valid && !lsu_busy) begin //条件。？
+            pc <= pc + 32'h4; 
         end
     end
     
     //状态寄存器
     always @(posedge clk) begin
         if (rst) begin
-            current_state <= IFU_IDLE;
+            ifu_current_state <= IFU_IDLE;
         end else begin
-            current_state <= next_state;
+            ifu_current_state <= ifu_next_state;
         end
     end
     
     //输出逻辑和下一状态逻辑
     always @(*) begin
-        case (current_state)
-            IFU_IDLE: begin
-                ifu_raddr = pc;        // 在IDLE状态发送地址
+        case (ifu_current_state)
+            IFU_IDLE: begin   //00
+                ifu_raddr = pc;
+                inst_valid = 1'b0;
+                inst = 32'h0;
+                //如果LSU忙或者需要读内存，进入HOLD；否则正常取指
+                if (lsu_busy || (mem_ren && !mem_data_valid)) begin
+                    ifu_next_state = IFU_HOLD;
+                end else begin
+                    ifu_next_state = IFU_WAIT;
+                end
+            end
+            
+            IFU_WAIT: begin   //01
+                ifu_raddr = pc;
+                inst_valid = 1'b1;
+                inst = ifu_rdata;
+
+                //只要当前指令是内存操作，就进入HOLD等待。？？
+                if (mem_ren || lsu_busy) begin
+                    ifu_next_state = IFU_HOLD;
+                end else begin
+                    ifu_next_state = IFU_IDLE;
+                end
+            end
+            
+            IFU_HOLD: begin   //10
+                ifu_raddr = pc;        // 保持当前地址
                 inst_valid = 1'b0;     // 指令无效
-                inst = 32'h0;          // 输出0
-                next_state = IFU_WAIT; // 下一周期进入WAIT
+                inst = 32'h0;
+                
+                //等待所有条件满足：LSU不忙且内存操作完成。？？
+                if (!lsu_busy && (!mem_ren || mem_data_valid)) begin
+                    ifu_next_state = IFU_WAIT;
+                end else begin
+                    ifu_next_state = IFU_HOLD;
+                end
             end
-            IFU_WAIT: begin
-                ifu_raddr = pc;        // 保持地址
-                inst_valid = 1'b1;     // 指令有效
-                inst = ifu_rdata;      // 使用存储器返回的数据
-                next_state = IFU_IDLE; // 下一周期回到IDLE
-            end
+            
             default: begin
                 ifu_raddr = 32'h0;
                 inst_valid = 1'b0;
                 inst = 32'h0;
-                next_state = IFU_IDLE;
+                ifu_next_state = IFU_IDLE;
             end
         endcase
     end
@@ -159,6 +182,8 @@ module ysyx_25070198_exu(
     output csr_wen,
     output [11:0] csr_addr,
 
+    input mem_data_valid,
+
     input [31:0] pc,
     input [31:0] reg_rdata1,reg_rdata2,imm,
     output mem_ren,mem_wen,reg_wen,reg_men,
@@ -173,11 +198,12 @@ module ysyx_25070198_exu(
 assign jump_pc = is_jalr ? (reg_rdata1 + imm) & 32'hFFFFFFFE : 32'b0;
 assign jump = is_jalr;
 
-assign reg_wen = (is_add || is_addi || is_jalr || is_lui || is_csrrw) && inst_valid;
+assign reg_wen = ((is_add || is_addi || is_jalr || is_lui || is_csrrw) && inst_valid) || 
+                 ((is_lw || is_lbu) && mem_data_valid);
 assign reg_men = (is_lw || is_lbu) && inst_valid;
 
-assign mem_ren = (is_lw || is_lbu) && inst_valid;
-assign mem_wen = (is_sw || is_sb) && inst_valid;
+assign mem_ren = (is_lw || is_lbu) && inst_valid && !mem_data_valid;
+assign mem_wen = (is_sw || is_sb) && inst_valid;// && !mem_data_valid;
 
 assign sel = {reg_rdata1 + imm}[1:0];
 
@@ -234,6 +260,7 @@ wire [7:0] mem_rdatas = (sel == 2'd0) ? mem_rdata[7:0] :
                         0;
 
 integer i;
+/*
 always@(posedge clk or posedge rst) begin
     if(rst) begin
         for(i=0; i<32; i=i+1) rf[i] <= 0;
@@ -243,6 +270,20 @@ always@(posedge clk or posedge rst) begin
     end
     else if(reg_men && reg_waddr != 5'b0) begin
         rf[reg_waddr] <= (is_lbu) ? {24'b0, mem_rdatas} : mem_rdata;
+    end
+end
+*/
+always@(posedge clk or posedge rst) begin
+    if(rst) begin
+        for(i=0; i<32; i=i+1) rf[i] <= 0;
+    end
+    else if(reg_wen && reg_waddr != 5'b0) begin
+        // 如果是内存读取操作，使用mem_rdata；否则使用reg_wdata
+        if(reg_men) begin
+            rf[reg_waddr] <= (is_lbu) ? {24'b0, mem_rdatas} : mem_rdata;
+        end else begin
+            rf[reg_waddr] <= reg_wdata;
+        end
     end
 end
 
