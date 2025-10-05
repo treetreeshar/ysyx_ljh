@@ -46,6 +46,7 @@ module top(
     reg [31:0] lsu_rdata;
     wire mem_data_valid;
     wire lsu_busy;
+    wire inst_done;
     
     // 内存接口
     wire [31:0] mem_rdata;
@@ -58,7 +59,10 @@ module top(
     // SimpleBus 接口
     wire [31:0] ifu_raddr;
     reg [31:0] ifu_rdata;
-    
+
+    // 指令执行完成
+    assign inst_done = inst_valid && (!(is_lw || is_lbu) || lsu_busy);
+
     // 取指
     //assign inst = pmem_read(pc);
     always @(posedge clk) begin
@@ -90,9 +94,9 @@ module top(
         .pc(pc),
         .inst(inst),
         .inst_valid(inst_valid),
+        .inst_done(inst_done),
         .mem_data_valid(mem_data_valid),
-        .mem_ren(mem_ren),  
-        .lsu_busy(lsu_busy), 
+        .mem_ren(mem_ren),
         .ifu_rdata(ifu_rdata),
         .ifu_raddr(ifu_raddr)
     );

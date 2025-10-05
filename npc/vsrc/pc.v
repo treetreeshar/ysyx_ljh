@@ -7,7 +7,7 @@ module ysyx_25070198_ifu(
     input jump,
     input mem_data_valid,
     input mem_ren,
-    input lsu_busy,
+    input inst_done,
     
     output reg [31:0] pc,
     output reg [31:0] inst,
@@ -20,8 +20,7 @@ module ysyx_25070198_ifu(
     //状态定义
     typedef enum logic [1:0] {
         IFU_IDLE = 2'b00,
-        IFU_WAIT = 2'b01,
-        IFU_HOLD = 2'b10
+        IFU_WAIT = 2'b01
     } ifu_state_t;
     
     ifu_state_t ifu_current_state, ifu_next_state;
@@ -33,7 +32,7 @@ module ysyx_25070198_ifu(
         else if (jump) begin
             pc <= jump_pc;
         end
-        else if (inst_valid && !lsu_busy) begin //条件。？
+        else if (inst_done) begin
             pc <= pc + 32'h4; 
         end
     end
@@ -54,37 +53,19 @@ module ysyx_25070198_ifu(
                 ifu_raddr = pc;
                 inst_valid = 1'b0;
                 inst = 32'h0;
-                //如果LSU忙或者需要读内存，进入HOLD；否则正常取指
-                if (lsu_busy || (mem_ren && !mem_data_valid)) begin
-                    ifu_next_state = IFU_HOLD;
-                end else begin
-                    ifu_next_state = IFU_WAIT;
+                ifu_next_state = IFU_WAIT;
                 end
-            end
             
             IFU_WAIT: begin   //01
                 ifu_raddr = pc;
                 inst_valid = 1'b1;
                 inst = ifu_rdata;
 
-                //只要当前指令是内存操作，就进入HOLD等待。？？
-                if (mem_ren || lsu_busy) begin
-                    ifu_next_state = IFU_HOLD;
-                end else begin
+                //如果指令执行完成，进入IDLE状态，准备取下一条指令
+                if (inst_done) begin
                     ifu_next_state = IFU_IDLE;
-                end
-            end
-            
-            IFU_HOLD: begin   //10
-                ifu_raddr = pc;        // 保持当前地址
-                inst_valid = 1'b0;     // 指令无效
-                inst = 32'h0;
-                
-                //等待所有条件满足：LSU不忙且内存操作完成。？？
-                if (!lsu_busy && (!mem_ren || mem_data_valid)) begin
-                    ifu_next_state = IFU_WAIT;
                 end else begin
-                    ifu_next_state = IFU_HOLD;
+                    ifu_next_state = IFU_WAIT;
                 end
             end
             

@@ -195,16 +195,17 @@ int main(int argc, char** argv) {
 
     start_time_us = get_current_time_us();
 
-    reset(4);
+    reset(20);
     long long int turn = 0;
+    uint32_t a0 = 0; //x10寄存器
 
-    while (!Verilated::gotFinish() && turn < 500 && !simulation_finished) { //
+    while (!Verilated::gotFinish() && !simulation_finished) { //&& turn < 500 
         uint32_t current_pc = dut.pc;
         uint32_t current_inst = dut.inst;
         
         single_cycle();
         turn++;
-        /**/
+        /*
         if (cycle_count % 4 == 0) { //&& cycle_count > 12400
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << current_pc
@@ -213,12 +214,11 @@ int main(int argc, char** argv) {
                     << " x10=0x" <<dut.debug_x10
                     << std::dec << std::endl;
             }
-        
+        */
         // 检查当前指令是否为 ebreak
         bool is_ebreak = (current_inst == 0x00100073);
         if (is_ebreak) {
-            // 获取 a0 寄存器的值（RISC-V x10）
-            uint32_t a0 = dut.debug_x10; 
+            a0 = dut.debug_x10; 
             uint32_t mcycle = dut.mcycle;
             uint32_t mcycleh = dut.mcycleh;
             
@@ -239,5 +239,5 @@ int main(int argc, char** argv) {
         delete tfp;
     }
     dut.final();
-    return 0;
+    return !(a0 == 0);
 }
