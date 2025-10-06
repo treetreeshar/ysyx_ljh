@@ -80,11 +80,11 @@ module ysyx_25070198_lsu(
             end
             
             LSU_WAIT: begin   //1
-                lsu_reqValid = 1'b1;       //保持请求有效
-                lsu_addr = mem_addr;       //保持地址不变
-                lsu_wen = 1'b0;           //读等待时关闭写使能
-                lsu_wdata = 32'b0;
-                lsu_wmask = 4'b0;
+                lsu_reqValid = 1'b1;      //保持请求有效
+                lsu_addr = mem_addr;      //保持地址不变
+                lsu_wen = mem_wen;        //保持写使能状态
+                lsu_wdata = mem_wdata;    //保持写数据
+                lsu_wmask = mem_mask;     //保持写掩码
                 if(lsu_respValid)
                     mem_data_valid = 1'b1;    //数据有效
                 else

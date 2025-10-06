@@ -10,7 +10,7 @@ module ysyx_25070198_ifu(
     input inst_done,
     
     output reg [31:0] pc,
-    output reg [31:0] inst,
+    output [31:0] inst,
     output reg inst_valid,
     
     output reg [31:0] ifu_raddr,
@@ -21,9 +21,10 @@ module ysyx_25070198_ifu(
 );
 
     //状态定义
-    typedef enum logic  {
-        IFU_IDLE = 1'b0,
-        IFU_WAIT = 1'b1
+    typedef enum logic [1:0] {
+        IFU_IDLE = 2'b00,
+        IFU_WAIT = 2'b01,
+        IFU_STAY = 2'b10  //wait for ifu_respValid
     } ifu_state_t;
     
     ifu_state_t ifu_current_state, ifu_next_state;
@@ -49,25 +50,51 @@ module ysyx_25070198_ifu(
         end
     end
     
+    reg [31:0] inst_reg;
+    reg [31:0] inst_next;
+    always @(posedge clk) begin
+        if (rst) begin
+            inst_reg <= 32'h0;
+        end else begin
+            inst_reg <= inst_next;
+        end
+    end
+    assign inst = inst_reg;
+
     //输出逻辑和下一状态逻辑
     always @(*) begin
         case (ifu_current_state)
-            IFU_IDLE: begin   //0
+            IFU_IDLE: begin   //00   发送取指请求
                 ifu_reqValid = 1'b1;
                 ifu_raddr = pc;
                 inst_valid = 1'b0;
-                inst = 32'h0;
-                ifu_next_state = IFU_WAIT;
-                end
-            
-            IFU_WAIT: begin   //1
+                inst_next = 32'h0;
+                ifu_next_state = IFU_STAY;
+            end
+
+            IFU_STAY: begin   //10   等待响应
                 ifu_reqValid = 1'b1;
                 ifu_raddr = pc;
+                inst_valid = 1'b0;
+                
+                //收到响应，进入WAIT状态，准备执行指令
+                if (ifu_respValid) begin
+                    ifu_next_state = IFU_WAIT;
+                    inst_next = ifu_rdata;
+                end else begin
+                    ifu_next_state = IFU_STAY;
+                    inst_next = inst_reg;
+                end
+            end
+
+            IFU_WAIT: begin   //01   等待执行完成
+                ifu_reqValid = 1'b0;
+                ifu_raddr = pc;
                 inst_valid = 1'b1;
-                inst = ifu_rdata;
+                inst_next = inst_reg;
 
                 //如果指令执行完成，进入IDLE状态，准备取下一条指令
-                if (inst_done) begin // && ifu_respValid
+                if (inst_done) begin 
                     ifu_next_state = IFU_IDLE;
                 end else begin
                     ifu_next_state = IFU_WAIT;
@@ -78,7 +105,7 @@ module ysyx_25070198_ifu(
                 ifu_reqValid = 1'b0;
                 ifu_raddr = 32'h0;
                 inst_valid = 1'b0;
-                inst = 32'h0;
+                inst_next = 32'h0;
                 ifu_next_state = IFU_IDLE;
             end
         endcase
@@ -183,7 +210,7 @@ module ysyx_25070198_exu(
     output jump
 );
 assign jump_pc = is_jalr ? (reg_rdata1 + imm) & 32'hFFFFFFFE : 32'b0;
-assign jump = is_jalr;
+assign jump = is_jalr && inst_valid;
 
 assign reg_wen = ((is_add || is_addi || is_jalr || is_lui || is_csrrw) && inst_valid) || 
                  ((is_lw || is_lbu) && mem_data_valid);
