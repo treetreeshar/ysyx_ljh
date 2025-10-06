@@ -21,9 +21,9 @@ module ysyx_25070198_ifu(
 );
 
     //状态定义
-    typedef enum logic [1:0] {
-        IFU_IDLE = 2'b00,
-        IFU_WAIT = 2'b01
+    typedef enum logic  {
+        IFU_IDLE = 1'b0,
+        IFU_WAIT = 1'b1
     } ifu_state_t;
     
     ifu_state_t ifu_current_state, ifu_next_state;
@@ -52,20 +52,22 @@ module ysyx_25070198_ifu(
     //输出逻辑和下一状态逻辑
     always @(*) begin
         case (ifu_current_state)
-            IFU_IDLE: begin   //00
+            IFU_IDLE: begin   //0
+                ifu_reqValid = 1'b1;
                 ifu_raddr = pc;
                 inst_valid = 1'b0;
                 inst = 32'h0;
                 ifu_next_state = IFU_WAIT;
                 end
             
-            IFU_WAIT: begin   //01
+            IFU_WAIT: begin   //1
+                ifu_reqValid = 1'b1;
                 ifu_raddr = pc;
                 inst_valid = 1'b1;
                 inst = ifu_rdata;
 
                 //如果指令执行完成，进入IDLE状态，准备取下一条指令
-                if (inst_done) begin
+                if (inst_done) begin // && ifu_respValid
                     ifu_next_state = IFU_IDLE;
                 end else begin
                     ifu_next_state = IFU_WAIT;
@@ -73,6 +75,7 @@ module ysyx_25070198_ifu(
             end
             
             default: begin
+                ifu_reqValid = 1'b0;
                 ifu_raddr = 32'h0;
                 inst_valid = 1'b0;
                 inst = 32'h0;

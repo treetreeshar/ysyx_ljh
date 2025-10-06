@@ -68,14 +68,14 @@ module top(
 
     // 取指
     //assign inst = pmem_read(pc);
-    
+    /*
     always @(posedge clk) begin
         if(rst) 
             ifu_rdata <= 32'b0;
         else
             ifu_rdata <= pmem_read(ifu_raddr);
     end
-    /*
+    */
     always @(posedge clk) begin
         if (rst) begin
             ifu_rdata <= 32'b0;
@@ -85,7 +85,7 @@ module top(
             ifu_respValid <= ifu_reqValid;
         end
     end
-    */
+    
 
     // 内存访问
     //assign mem_rdata = pmem_read({mem_addr, 2'b0});
@@ -94,14 +94,14 @@ module top(
     //        pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
     //    end
     //end
-    
+    /*
     always @(posedge clk) begin
         lsu_rdata <= (!lsu_wen) ? pmem_read(lsu_addr) : 32'b0;
         if (lsu_wen) begin
             pmem_write(lsu_addr, lsu_wdata, {4'b0, lsu_wmask});
         end
     end
-    /*
+    */
     always @(posedge clk) begin
         lsu_rdata <= (lsu_reqValid && !lsu_wen) ? pmem_read(lsu_addr) : 32'b0;
         if (lsu_reqValid && lsu_wen) begin
@@ -109,7 +109,7 @@ module top(
         end
         lsu_respValid <= lsu_reqValid;
     end
-    */
+    
 
     ysyx_25070198_ifu ysyx_25070198_ifu0(
         .clk(clk),

@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
     long long int turn = 0;
     uint32_t a0 = 0; //x10寄存器
 
-    while (!Verilated::gotFinish() && !simulation_finished) { //&& turn < 500 
+    while (!Verilated::gotFinish()  && !simulation_finished) { //&& turn < 500
         uint32_t current_pc = dut.pc;
         uint32_t current_inst = dut.inst;
         
@@ -210,8 +210,6 @@ int main(int argc, char** argv) {
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << current_pc
                     << " Inst=0x" << current_inst
-                    << " x5=0x" << dut.debug_x4
-                    << " x10=0x" <<dut.debug_x10
                     << std::dec << std::endl;
             }
         */

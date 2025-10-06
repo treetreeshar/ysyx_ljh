@@ -45,16 +45,19 @@ module ysyx_25070198_lsu(
     //下一状态逻辑
     always @(*) begin
         case (lsu_current_state)
-            LSU_IDLE: begin
-                if (mem_ren) begin
+            LSU_IDLE: begin    //0
+                if (mem_ren || mem_wen) begin
                     lsu_next_state = LSU_WAIT;  //读操作->等待
                 end else begin
                     lsu_next_state = LSU_IDLE;
                 end
             end
 
-            LSU_WAIT: begin
-                lsu_next_state = LSU_IDLE;  //读完成返回IDLE
+            LSU_WAIT: begin    //1
+                if(lsu_respValid) 
+                    lsu_next_state = LSU_IDLE;  //读完成返回IDLE
+                else
+                    lsu_next_state = LSU_WAIT;  //继续等待
             end
             
             default: begin
@@ -66,7 +69,8 @@ module ysyx_25070198_lsu(
     //输出逻辑
     always @(*) begin
         case (lsu_current_state)
-            LSU_IDLE: begin
+            LSU_IDLE: begin   //0
+                lsu_reqValid = mem_ren || mem_wen;
                 lsu_addr = mem_addr;
                 lsu_wen = mem_wen;
                 lsu_wdata = mem_wdata;
@@ -75,16 +79,21 @@ module ysyx_25070198_lsu(
                 mem_rdata = 32'b0;
             end
             
-            LSU_WAIT: begin
+            LSU_WAIT: begin   //1
+                lsu_reqValid = 1'b1;       //保持请求有效
                 lsu_addr = mem_addr;       //保持地址不变
                 lsu_wen = 1'b0;           //读等待时关闭写使能
                 lsu_wdata = 32'b0;
                 lsu_wmask = 4'b0;
-                mem_data_valid = 1'b1;    //数据有效
+                if(lsu_respValid)
+                    mem_data_valid = 1'b1;    //数据有效
+                else
+                    mem_data_valid = 1'b0;
                 mem_rdata = lsu_rdata;    //使用从内存读取的数据
             end
 
             default: begin
+                lsu_reqValid = 1'b0;
                 lsu_addr = 32'b0;
                 lsu_wen = 1'b0;
                 lsu_wdata = 32'b0;
