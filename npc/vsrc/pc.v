@@ -14,7 +14,10 @@ module ysyx_25070198_ifu(
     output reg inst_valid,
     
     output reg [31:0] ifu_raddr,
-    input [31:0] ifu_rdata
+    input [31:0] ifu_rdata,
+
+    output reg ifu_reqValid,
+    input ifu_respValid
 );
 
     //状态定义

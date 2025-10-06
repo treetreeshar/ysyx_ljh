@@ -4,7 +4,7 @@ INC_PATH ?=  #可添加自定义头文件路径
 
 VERILATOR_CFLAGS += --cc --build --x-assign fast --x-initial fast
 #VERILATOR_CFLAGS += -O3 --noassert
-VERILATOR_CFLAGS += --trace   #波形跟踪
+#VERILATOR_CFLAGS += --trace   波形跟踪
 BUILD_DIR = ./build
 OBJ_DIR = $(BUILD_DIR)/obj_dir
 BIN = $(BUILD_DIR)/$(TOPNAME)

@@ -14,15 +14,15 @@ module ysyx_25070198_lsu(
     output reg [31:0] mem_rdata,
     output reg mem_data_valid,
     
-    //暂停流水线。？
-    output reg lsu_busy,
-    
     //SimpleBus接口
     output reg [31:0] lsu_addr,
     output reg lsu_wen,
     output reg [31:0] lsu_wdata,
     output reg [3:0] lsu_wmask,
-    input [31:0] lsu_rdata
+    input [31:0] lsu_rdata,
+
+    output reg lsu_reqValid,
+    input lsu_respValid
 );
 
     //状态定义
@@ -63,18 +63,8 @@ module ysyx_25070198_lsu(
         endcase
     end
     
-    //输出逻辑。？？？
+    //输出逻辑
     always @(*) begin
-        
-        //这块删掉之后输出会不一样。。。
-        lsu_addr = mem_addr;
-        lsu_wen = mem_wen;
-        lsu_wdata = mem_wdata;
-        lsu_wmask = mem_mask;
-        mem_data_valid = 1'b0;
-        mem_rdata = 32'b0;
-        lsu_busy = 1'b0;
-        
         case (lsu_current_state)
             LSU_IDLE: begin
                 lsu_addr = mem_addr;
@@ -86,12 +76,12 @@ module ysyx_25070198_lsu(
             end
             
             LSU_WAIT: begin
+                lsu_addr = mem_addr;       //保持地址不变
                 lsu_wen = 1'b0;           //读等待时关闭写使能
                 lsu_wdata = 32'b0;
                 lsu_wmask = 4'b0;
                 mem_data_valid = 1'b1;    //数据有效
                 mem_rdata = lsu_rdata;    //使用从内存读取的数据
-                lsu_busy = 1'b1;          //读等待期间暂停流水线。？
             end
 
             default: begin
@@ -101,7 +91,6 @@ module ysyx_25070198_lsu(
                 lsu_wmask = 4'b0;
                 mem_data_valid = 1'b0;
                 mem_rdata = 32'b0;
-                lsu_busy = 1'b0;
             end
         endcase
     end

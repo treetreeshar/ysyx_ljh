@@ -45,7 +45,6 @@ module top(
     wire [3:0] lsu_wmask;
     reg [31:0] lsu_rdata;
     wire mem_data_valid;
-    wire lsu_busy;
     wire inst_done;
     
     // 内存接口
@@ -59,18 +58,34 @@ module top(
     // SimpleBus 接口
     wire [31:0] ifu_raddr;
     reg [31:0] ifu_rdata;
+    wire ifu_reqValid;
+    reg ifu_respValid;
+    wire lsu_reqValid;
+    reg lsu_respValid;
 
     // 指令执行完成
-    assign inst_done = inst_valid && (!(is_lw || is_lbu) || lsu_busy);
+    assign inst_done = inst_valid && (!(is_lw || is_lbu) || mem_data_valid);
 
     // 取指
     //assign inst = pmem_read(pc);
+    
     always @(posedge clk) begin
         if(rst) 
             ifu_rdata <= 32'b0;
         else
             ifu_rdata <= pmem_read(ifu_raddr);
     end
+    /*
+    always @(posedge clk) begin
+        if (rst) begin
+            ifu_rdata <= 32'b0;
+            ifu_respValid <= 1'b0;
+        end else begin
+            ifu_rdata <= ifu_reqValid ? pmem_read(ifu_raddr) : 32'b0;
+            ifu_respValid <= ifu_reqValid;
+        end
+    end
+    */
 
     // 内存访问
     //assign mem_rdata = pmem_read({mem_addr, 2'b0});
@@ -79,12 +94,22 @@ module top(
     //        pmem_write({mem_addr, 2'b0}, mem_wdata, {4'b0, mem_mask});
     //    end
     //end
+    
     always @(posedge clk) begin
         lsu_rdata <= (!lsu_wen) ? pmem_read(lsu_addr) : 32'b0;
         if (lsu_wen) begin
             pmem_write(lsu_addr, lsu_wdata, {4'b0, lsu_wmask});
         end
     end
+    /*
+    always @(posedge clk) begin
+        lsu_rdata <= (lsu_reqValid && !lsu_wen) ? pmem_read(lsu_addr) : 32'b0;
+        if (lsu_reqValid && lsu_wen) begin
+            pmem_write(lsu_addr, lsu_wdata, {4'b0, lsu_wmask});
+        end
+        lsu_respValid <= lsu_reqValid;
+    end
+    */
 
     ysyx_25070198_ifu ysyx_25070198_ifu0(
         .clk(clk),
@@ -98,7 +123,9 @@ module top(
         .mem_data_valid(mem_data_valid),
         .mem_ren(mem_ren),
         .ifu_rdata(ifu_rdata),
-        .ifu_raddr(ifu_raddr)
+        .ifu_raddr(ifu_raddr),
+        .ifu_reqValid(ifu_reqValid),
+        .ifu_respValid(ifu_respValid)
     );
     
     ysyx_25070198_idu ysyx_25070198_idu0(
@@ -196,12 +223,13 @@ module top(
         .mem_mask(mem_mask),
         .mem_rdata(mem_rdata),
         .mem_data_valid(mem_data_valid),
-        .lsu_busy(lsu_busy),
         .lsu_addr(lsu_addr),
         .lsu_wen(lsu_wen),
         .lsu_wdata(lsu_wdata),
         .lsu_wmask(lsu_wmask),
-        .lsu_rdata(lsu_rdata)
+        .lsu_rdata(lsu_rdata),
+        .lsu_reqValid(lsu_reqValid),
+        .lsu_respValid(lsu_respValid)
     );
 
 endmodule
