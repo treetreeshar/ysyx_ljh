@@ -47,7 +47,7 @@ module ysyx_25070198_lsu(
         case (lsu_current_state)
             LSU_IDLE: begin    //0
                 if (mem_ren || mem_wen) begin
-                    lsu_next_state = LSU_WAIT;  //读操作->等待
+                    lsu_next_state = LSU_WAIT;  //读写操作->等待
                 end else begin
                     lsu_next_state = LSU_IDLE;
                 end
@@ -55,7 +55,7 @@ module ysyx_25070198_lsu(
 
             LSU_WAIT: begin    //1
                 if(lsu_respValid) 
-                    lsu_next_state = LSU_IDLE;  //读完成返回IDLE
+                    lsu_next_state = LSU_IDLE;  //完成返回IDLE
                 else
                     lsu_next_state = LSU_WAIT;  //继续等待
             end

@@ -8,17 +8,20 @@
 #include <sstream>
 #include <time.h>
 #include <sys/time.h>
-//#include "verilated_vcd_c.h"
+#include "verilated_vcd_c.h"
 
 #define ysyx_25070198_SERIAL_PORT 0xa00003f8 //abstract-machine/am/src/riscv/npc/trm.c
 #define ysyx_25070198_RTC_ADDR    0xa0000048 //abstract-machine/am/src/riscv/npc/timer.c
+#define WAVE 1
 
 static Vtop dut;
 static vluint64_t cycle_count = 0;
 bool simulation_finished = false;
 std::map<uint32_t, uint32_t> memory;
 static uint64_t start_time_us = 0;
-//static VerilatedVcdC* tfp;
+#ifdef WAVE
+    static VerilatedVcdC* tfp;
+#endif
 
 static uint64_t get_current_time_us() {
     struct timeval tv;
@@ -149,9 +152,13 @@ void load_custom_hex(const std::string& filename, uint32_t base_address) {
 
 static void single_cycle() {
     dut.clk = 0; dut.eval();
-    //if (tfp) tfp->dump(cycle_count);  // 记录下降沿
+    #ifdef WAVE
+        if (tfp) tfp->dump(cycle_count);  // 记录下降沿
+    #endif
     dut.clk = 1; dut.eval();
-    //if (tfp) tfp->dump(cycle_count + 1);  // 记录上升沿
+    #ifdef WAVE
+        if (tfp) tfp->dump(cycle_count + 1);  // 记录上升沿
+    #endif
     cycle_count += 2;
 }
 
@@ -188,10 +195,12 @@ int main(int argc, char** argv) {
     }
 
     // 初始化波形
-    //Verilated::traceEverOn(true);
-    //tfp = new VerilatedVcdC;
-    //dut.trace(tfp, 99);
-    //tfp->open("wave.vcd");
+    #ifdef WAVE
+        Verilated::traceEverOn(true);
+        tfp = new VerilatedVcdC;
+        dut.trace(tfp, 99);
+        tfp->open("wave.vcd");
+    #endif
 
     start_time_us = get_current_time_us();
 
@@ -199,26 +208,28 @@ int main(int argc, char** argv) {
     long long int turn = 0;
     uint32_t a0 = 0; //x10寄存器
 
-    while (!Verilated::gotFinish()  && !simulation_finished) { //&& turn < 700
+    while (!Verilated::gotFinish() && turn < 466 && !simulation_finished) { //
         uint32_t current_pc = dut.pc;
         uint32_t current_inst = dut.inst;
         
         single_cycle();
         turn++;
-        /*
-        if (cycle_count % 6 == 0) { //&& cycle_count > 12400
+        /**/
+        if (cycle_count % 4 == 0 && turn > 450) { //
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << current_pc
                     << " Inst=0x" << current_inst
+                    << " x10=0x" << dut.debug_x10
+                    << " x5=0x" << dut.debug_x4
                     << std::dec << std::endl;
             }
-        */
+        
         // 检查当前指令是否为 ebreak
         bool is_ebreak = (current_inst == 0x00100073);
         if (is_ebreak) {
             a0 = dut.debug_x10; 
-            uint32_t mcycle = dut.mcycle;
-            uint32_t mcycleh = dut.mcycleh;
+            //uint32_t mcycle = dut.mcycle;
+            //uint32_t mcycleh = dut.mcycleh;
             
             // 输出程序状态
             //printf("\nmcycle: %lu\n", (uint64_t)mcycleh << 32 | mcycle);
@@ -232,10 +243,12 @@ int main(int argc, char** argv) {
     }
     
     // 清理
-    //if (tfp) {
-    //    tfp->close();
-    //    delete tfp;
-    //}
-    //dut.final();
+    #ifdef WAVE
+        if (tfp) {
+            tfp->close();
+            delete tfp;
+        }
+    dut.final();
+    #endif
     return !(a0 == 0);
 }

@@ -66,6 +66,7 @@ module top(
     // 指令执行完成
     assign inst_done = inst_valid && (!(is_lw || is_lbu) || mem_data_valid);
 
+    reg [5:0] cnt1, cnt2;
     // 取指
     //assign inst = pmem_read(pc);
     /*
@@ -82,7 +83,14 @@ module top(
             ifu_respValid <= 1'b0;
         end else begin
             ifu_rdata <= ifu_reqValid ? pmem_read(ifu_raddr) : 32'b0;
-            ifu_respValid <= ifu_reqValid;
+            if (cnt1 == 6'd2) begin
+                ifu_respValid <= ifu_reqValid;
+                cnt1 <= 6'b0;
+            end
+            else begin
+                ifu_respValid <= 1'b0;
+                cnt1 <= cnt1 + 6'b1;
+            end
         end
     end
     
@@ -107,7 +115,14 @@ module top(
         if (lsu_reqValid && lsu_wen) begin
             pmem_write(lsu_addr, lsu_wdata, {4'b0, lsu_wmask});
         end
-        lsu_respValid <= lsu_reqValid;
+        if (cnt2 == 6'd2) begin
+            lsu_respValid <= lsu_reqValid;
+            cnt2 <= 6'b0;
+        end
+        else begin
+            lsu_respValid <= 1'b0;
+            cnt2 <= cnt2 + 6'b1;
+        end
     end
     
 
