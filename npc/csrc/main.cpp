@@ -12,7 +12,7 @@
 
 #define ysyx_25070198_SERIAL_PORT 0xa00003f8 //abstract-machine/am/src/riscv/npc/trm.c
 #define ysyx_25070198_RTC_ADDR    0xa0000048 //abstract-machine/am/src/riscv/npc/timer.c
-#define WAVE 1
+#define WAVE 0
 
 static Vtop dut;
 static vluint64_t cycle_count = 0;
@@ -208,14 +208,14 @@ int main(int argc, char** argv) {
     long long int turn = 0;
     uint32_t a0 = 0; //x10寄存器
 
-    while (!Verilated::gotFinish() && turn < 466 && !simulation_finished) { //
+    while (!Verilated::gotFinish() && !simulation_finished) { // && turn < 80000
         uint32_t current_pc = dut.pc;
         uint32_t current_inst = dut.inst;
         
         single_cycle();
         turn++;
-        /**/
-        if (cycle_count % 4 == 0 && turn > 450) { //
+        /*
+        if (cycle_count % 40000 == 0 ) { //&& turn > 450
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << current_pc
                     << " Inst=0x" << current_inst
@@ -223,7 +223,7 @@ int main(int argc, char** argv) {
                     << " x5=0x" << dut.debug_x4
                     << std::dec << std::endl;
             }
-        
+        */
         // 检查当前指令是否为 ebreak
         bool is_ebreak = (current_inst == 0x00100073);
         if (is_ebreak) {

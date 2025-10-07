@@ -44,7 +44,6 @@ module top(
     wire [31:0] lsu_wdata;
     wire [3:0] lsu_wmask;
     reg [31:0] lsu_rdata;
-    wire mem_data_valid;
     wire inst_done;
     
     // 内存接口
@@ -64,7 +63,7 @@ module top(
     reg lsu_respValid;
 
     // 指令执行完成
-    assign inst_done = inst_valid && (!(is_lw || is_lbu) || mem_data_valid);
+    assign inst_done = inst_valid && (!(is_lw || is_lbu || is_sb || is_sw) || lsu_respValid);
 
     reg [5:0] cnt1, cnt2;
     // 取指
@@ -135,7 +134,7 @@ module top(
         .inst(inst),
         .inst_valid(inst_valid),
         .inst_done(inst_done),
-        .mem_data_valid(mem_data_valid),
+        .lsu_respValid(lsu_respValid),
         .mem_ren(mem_ren),
         .ifu_rdata(ifu_rdata),
         .ifu_raddr(ifu_raddr),
@@ -191,7 +190,7 @@ module top(
         .jump(jump),
 
         .inst_valid(inst_valid),
-        .mem_data_valid(mem_data_valid),
+        .lsu_respValid(lsu_respValid),
 
         .is_csrrw(is_csrrw),
         .csr_rdata(csr_rdata),
@@ -237,14 +236,13 @@ module top(
         .mem_wdata(mem_wdata),
         .mem_mask(mem_mask),
         .mem_rdata(mem_rdata),
-        .mem_data_valid(mem_data_valid),
+        .lsu_respValid(lsu_respValid),
         .lsu_addr(lsu_addr),
         .lsu_wen(lsu_wen),
         .lsu_wdata(lsu_wdata),
         .lsu_wmask(lsu_wmask),
         .lsu_rdata(lsu_rdata),
-        .lsu_reqValid(lsu_reqValid),
-        .lsu_respValid(lsu_respValid)
+        .lsu_reqValid(lsu_reqValid)
     );
 
 endmodule

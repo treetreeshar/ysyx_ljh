@@ -12,7 +12,6 @@ module ysyx_25070198_lsu(
     
     //到寄存器堆
     output reg [31:0] mem_rdata,
-    output reg mem_data_valid,
     
     //SimpleBus接口
     output reg [31:0] lsu_addr,
@@ -75,7 +74,6 @@ module ysyx_25070198_lsu(
                 lsu_wen = mem_wen;
                 lsu_wdata = mem_wdata;
                 lsu_wmask = mem_mask;
-                mem_data_valid = 1'b0;
                 mem_rdata = 32'b0;
             end
             
@@ -85,10 +83,6 @@ module ysyx_25070198_lsu(
                 lsu_wen = mem_wen;        //保持写使能状态
                 lsu_wdata = mem_wdata;    //保持写数据
                 lsu_wmask = mem_mask;     //保持写掩码
-                if(lsu_respValid)
-                    mem_data_valid = 1'b1;    //数据有效
-                else
-                    mem_data_valid = 1'b0;
                 mem_rdata = lsu_rdata;    //使用从内存读取的数据
             end
 
@@ -98,7 +92,6 @@ module ysyx_25070198_lsu(
                 lsu_wen = 1'b0;
                 lsu_wdata = 32'b0;
                 lsu_wmask = 4'b0;
-                mem_data_valid = 1'b0;
                 mem_rdata = 32'b0;
             end
         endcase

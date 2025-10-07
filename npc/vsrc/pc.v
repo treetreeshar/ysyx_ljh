@@ -5,7 +5,7 @@ module ysyx_25070198_ifu(
 
     input [31:0] jump_pc,
     input jump,
-    input mem_data_valid,
+    input lsu_respValid,
     input mem_ren,
     input inst_done,
     
@@ -196,7 +196,7 @@ module ysyx_25070198_exu(
     output csr_wen,
     output [11:0] csr_addr,
 
-    input mem_data_valid,
+    input lsu_respValid,
 
     input [31:0] pc,
     input [31:0] reg_rdata1,reg_rdata2,imm,
@@ -213,11 +213,11 @@ assign jump_pc = is_jalr ? (reg_rdata1 + imm) & 32'hFFFFFFFE : 32'b0;
 assign jump = is_jalr && inst_valid;
 
 assign reg_wen = ((is_add || is_addi || is_jalr || is_lui || is_csrrw) && inst_valid) || 
-                 ((is_lw || is_lbu) && mem_data_valid);
+                 ((is_lw || is_lbu) && lsu_respValid);
 assign reg_men = (is_lw || is_lbu) && inst_valid;
 
-assign mem_ren = (is_lw || is_lbu) && inst_valid && !mem_data_valid;
-assign mem_wen = (is_sw || is_sb) && inst_valid;// && !mem_data_valid;
+assign mem_ren = (is_lw || is_lbu) && inst_valid && !lsu_respValid;
+assign mem_wen = (is_sw || is_sb) && inst_valid;
 
 assign sel = {reg_rdata1 + imm}[1:0];
 
