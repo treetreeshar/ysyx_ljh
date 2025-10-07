@@ -1,4 +1,4 @@
-#include "Vtop.h"
+#include "VysyxSoCFull.h"
 #include "verilated.h"
 #include <iostream>
 #include <cstdint>
@@ -14,7 +14,7 @@
 #define ysyx_25070198_RTC_ADDR    0xa0000048 //abstract-machine/am/src/riscv/npc/timer.c
 #define WAVE 0
 
-static Vtop dut;
+static VysyxSoCFull* dut;
 static vluint64_t cycle_count = 0;
 bool simulation_finished = false;
 std::map<uint32_t, uint32_t> memory;
@@ -31,6 +31,14 @@ static uint64_t get_current_time_us() {
 
 extern "C" void npc_ebreak() {
     simulation_finished = true;
+}
+
+uint32_t pc, inst, a0;
+extern "C" void trans(uint32_t pc0, uint32_t inst0, uint32_t a00) {
+    pc = pc0;
+    inst = inst0;
+    a0 = a00;
+    printf("npc pc = 0x%08x\n", pc);
 }
 
 extern "C" int pmem_read(int raddr) {
@@ -150,12 +158,17 @@ void load_custom_hex(const std::string& filename, uint32_t base_address) {
               << " starting from 0x" << std::hex << base_address << std::dec << std::endl;
 }
 
+extern "C" void flash_read(int32_t addr, int32_t *data) { 
+    printf("flash_read not implemented\n");
+    assert(0); 
+}
+
 static void single_cycle() {
-    dut.clk = 0; dut.eval();
+    dut->clock = 0; dut->eval();
     #ifdef WAVE
         if (tfp) tfp->dump(cycle_count);  // 记录下降沿
     #endif
-    dut.clk = 1; dut.eval();
+    dut->clock = 1; dut->eval();
     #ifdef WAVE
         if (tfp) tfp->dump(cycle_count + 1);  // 记录上升沿
     #endif
@@ -163,16 +176,16 @@ static void single_cycle() {
 }
 
 static void reset(int n) {
-    dut.rst = 1;
+    dut->reset = 1;
     while (n-- > 0) single_cycle();
-    dut.rst = 0;
+    dut->reset = 0;
 }
 
 int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     
     const char* program_path = argv[1];
-    uint32_t base_address = 0x80000000; // 默认基地址
+    uint32_t base_address = 0x30000000; // 默认基地址
     
     if (argc >= 3) {
         char* end;
@@ -198,7 +211,7 @@ int main(int argc, char** argv) {
     #ifdef WAVE
         Verilated::traceEverOn(true);
         tfp = new VerilatedVcdC;
-        dut.trace(tfp, 99);
+        dut->trace(tfp, 99);
         tfp->open("wave.vcd");
     #endif
 
@@ -209,27 +222,23 @@ int main(int argc, char** argv) {
     uint32_t a0 = 0; //x10寄存器
 
     while (!Verilated::gotFinish() && !simulation_finished) { // && turn < 80000
-        uint32_t current_pc = dut.pc;
-        uint32_t current_inst = dut.inst;
         
         single_cycle();
         turn++;
-        /*
-        if (cycle_count % 40000 == 0 ) { //&& turn > 450
+        /**/
+        //if (cycle_count % 4 == 0 ) {} //&& turn > 450
             std::cout << "Cycle " << cycle_count/2 
-                    << ": PC=0x" << std::hex << current_pc
-                    << " Inst=0x" << current_inst
-                    << " x10=0x" << dut.debug_x10
-                    << " x5=0x" << dut.debug_x4
+                    << ": PC=0x" << std::hex << pc
+                    << " Inst=0x" << inst
+                    << " x10=0x" << a0
                     << std::dec << std::endl;
-            }
-        */
+            
+        
         // 检查当前指令是否为 ebreak
-        bool is_ebreak = (current_inst == 0x00100073);
-        if (is_ebreak) {
-            a0 = dut.debug_x10; 
-            //uint32_t mcycle = dut.mcycle;
-            //uint32_t mcycleh = dut.mcycleh;
+        //bool is_ebreak = (current_inst == 0x00100073);
+        if (simulation_finished) {
+            //uint32_t mcycle = dut->mcycle;
+            //uint32_t mcycleh = dut->mcycleh;
             
             // 输出程序状态
             //printf("\nmcycle: %lu\n", (uint64_t)mcycleh << 32 | mcycle);
@@ -248,7 +257,7 @@ int main(int argc, char** argv) {
             tfp->close();
             delete tfp;
         }
-    dut.final();
+    dut->final();
     #endif
     return !(a0 == 0);
 }

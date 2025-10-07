@@ -1,20 +1,18 @@
 module ysyx_25070198_csr_reg (
-    input clk,
-    input rst,
+    input clock,
+    input reset,
     input csr_wen,
     input [11:0] csr_addr,
     input [31:0] csr_wdata,//rs1 reg_rdata1
-    output [31:0] csr_rdata,
-    output reg [31:0] mcycle,
-    output reg [31:0] mcycleh
+    output [31:0] csr_rdata
 );
-    //reg [31:0] mcycle;
-    //reg [31:0] mcycleh;
+    reg [31:0] mcycle;
+    reg [31:0] mcycleh;
     reg [31:0] mvendorid;
     reg [31:0] marchid;
 
-    always @(posedge clk) begin
-        if (rst) begin
+    always @(posedge clock) begin
+        if (reset) begin
             {mcycleh, mcycle} <= 64'b0;
             mvendorid <= 32'h79737978;
             marchid <= 32'd25070198;

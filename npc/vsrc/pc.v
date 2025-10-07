@@ -1,11 +1,11 @@
 /******************ifu********************/
 module ysyx_25070198_ifu(
-    input clk,
-    input rst,
+    input clock,
+    input reset,
 
     input [31:0] jump_pc,
     input jump,
-    input lsu_respValid,
+    input io_lsu_respValid,
     input mem_ren,
     input inst_done,
     
@@ -14,24 +14,24 @@ module ysyx_25070198_ifu(
     output reg inst_valid,
     
     output reg [31:0] ifu_raddr,
-    input [31:0] ifu_rdata,
+    input [31:0] io_ifu_rdata,
 
-    output reg ifu_reqValid,
-    input ifu_respValid
+    output reg io_ifu_reqValid,
+    input io_ifu_respValid
 );
 
     //状态定义
     typedef enum logic [1:0] {
         IFU_IDLE = 2'b00,
         IFU_WAIT = 2'b01,
-        IFU_STAY = 2'b10  //wait for ifu_respValid
+        IFU_STAY = 2'b10  //wait for io_ifu_respValid
     } ifu_state_t;
     
     ifu_state_t ifu_current_state, ifu_next_state;
     
-    always @(posedge clk) begin
-        if (rst) begin
-            pc <= 32'h80000000;
+    always @(posedge clock) begin
+        if (reset) begin
+            pc <= 32'h30000000;
         end 
         else if (jump) begin
             pc <= jump_pc;
@@ -42,8 +42,8 @@ module ysyx_25070198_ifu(
     end
     
     //状态寄存器
-    always @(posedge clk) begin
-        if (rst) begin
+    always @(posedge clock) begin
+        if (reset) begin
             ifu_current_state <= IFU_IDLE;
         end else begin
             ifu_current_state <= ifu_next_state;
@@ -52,8 +52,8 @@ module ysyx_25070198_ifu(
     
     reg [31:0] inst_reg;
     reg [31:0] inst_next;
-    always @(posedge clk) begin
-        if (rst) begin
+    always @(posedge clock) begin
+        if (reset) begin
             inst_reg <= 32'h0;
         end else begin
             inst_reg <= inst_next;
@@ -65,7 +65,7 @@ module ysyx_25070198_ifu(
     always @(*) begin
         case (ifu_current_state)
             IFU_IDLE: begin   //00   发送取指请求
-                ifu_reqValid = 1'b1;
+                io_ifu_reqValid = 1'b1;
                 ifu_raddr = pc;
                 inst_valid = 1'b0;
                 inst_next = 32'h0;
@@ -73,14 +73,14 @@ module ysyx_25070198_ifu(
             end
 
             IFU_STAY: begin   //10   等待响应
-                ifu_reqValid = 1'b1;
+                io_ifu_reqValid = 1'b1;
                 ifu_raddr = pc;
                 inst_valid = 1'b0;
                 
                 //收到响应，进入WAIT状态，准备执行指令
-                if (ifu_respValid) begin
+                if (io_ifu_respValid) begin
                     ifu_next_state = IFU_WAIT;
-                    inst_next = ifu_rdata;
+                    inst_next = io_ifu_rdata;
                 end else begin
                     ifu_next_state = IFU_STAY;
                     inst_next = inst_reg;
@@ -88,7 +88,7 @@ module ysyx_25070198_ifu(
             end
 
             IFU_WAIT: begin   //01   等待执行完成
-                ifu_reqValid = 1'b0;
+                io_ifu_reqValid = 1'b0;
                 ifu_raddr = pc;
                 inst_valid = 1'b1;
                 inst_next = inst_reg;
@@ -102,7 +102,7 @@ module ysyx_25070198_ifu(
             end
             
             default: begin
-                ifu_reqValid = 1'b0;
+                io_ifu_reqValid = 1'b0;
                 ifu_raddr = 32'h0;
                 inst_valid = 1'b0;
                 inst_next = 32'h0;
@@ -115,8 +115,8 @@ endmodule
 
 /******************idu********************/
 module ysyx_25070198_idu(
-    input clk,
-    input rst,
+    input clock,
+    input reset,
 
     input [31:0] inst,
 
@@ -124,6 +124,8 @@ module ysyx_25070198_idu(
     output [4:0] rs2,
     output [4:0] rd,
     output [31:0] imm,
+
+    output [1:0] io_lsu_size,
 
     output is_addi,
     output is_jalr,
@@ -159,6 +161,10 @@ module ysyx_25070198_idu(
     assign is_sb   = (opcode == 7'b0100011) && (funct3 == 3'b000);    //S
 
     assign is_csrrw = (opcode == 7'b1110011) && (funct3 == 3'b001);   //I
+
+    assign io_lsu_size = (is_lw || is_sw) ? 2'b10 : 
+                         (is_lbu || is_sb) ? 2'b00 :
+                         2'b00;
     
     wire [31:0] i_imm = {{20{inst[31]}}, inst[31:20]};
     wire [31:0] s_imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};
@@ -177,8 +183,8 @@ endmodule
 
 /******************exu********************/
 module ysyx_25070198_exu(
-    input clk,
-    input rst,
+    input clock,
+    input reset,
 
     input inst_valid,
 
@@ -196,7 +202,7 @@ module ysyx_25070198_exu(
     output csr_wen,
     output [11:0] csr_addr,
 
-    input lsu_respValid,
+    input io_lsu_respValid,
 
     input [31:0] pc,
     input [31:0] reg_rdata1,reg_rdata2,imm,
@@ -213,10 +219,10 @@ assign jump_pc = is_jalr ? (reg_rdata1 + imm) & 32'hFFFFFFFE : 32'b0;
 assign jump = is_jalr && inst_valid;
 
 assign reg_wen = ((is_add || is_addi || is_jalr || is_lui || is_csrrw) && inst_valid) || 
-                 ((is_lw || is_lbu) && lsu_respValid);
+                 ((is_lw || is_lbu) && io_lsu_respValid);
 assign reg_men = (is_lw || is_lbu) && inst_valid;
 
-assign mem_ren = (is_lw || is_lbu) && inst_valid && !lsu_respValid;
+assign mem_ren = (is_lw || is_lbu) && inst_valid && !io_lsu_respValid;
 assign mem_wen = (is_sw || is_sb) && inst_valid;
 
 assign sel = {reg_rdata1 + imm}[1:0];
@@ -248,24 +254,21 @@ endmodule
 
 /******************reg********************/
 module ysyx_25070198_rf(
-    input clk,
-    input rst,
+    input clock,
+    input reset,
 
     input [31:0] reg_wdata,mem_rdata,
     input [4:0] reg_waddr,
     input reg_wen,reg_men,is_lbu,
     input [1:0] sel,
 
-    input [4:0] reg_raddr1,reg_raddr2,
-    output [31:0] reg_rdata1,reg_rdata2,
+    output reg [31:0] debug_x10,
 
-    output [31:0] debug_x4,debug_x10
+    input [4:0] reg_raddr1,reg_raddr2,
+    output [31:0] reg_rdata1,reg_rdata2
 
 );
 reg [31:0] rf [0:31];
-
-assign debug_x4 = rf[5];
-assign debug_x10 = rf[10];
 
 wire [7:0] mem_rdatas = (sel == 2'd0) ? mem_rdata[7:0] :
                         (sel == 2'd1) ? mem_rdata[15:8] :
@@ -275,8 +278,8 @@ wire [7:0] mem_rdatas = (sel == 2'd0) ? mem_rdata[7:0] :
 
 integer i;
 /*
-always@(posedge clk or posedge rst) begin
-    if(rst) begin
+always@(posedge clock or posedge reset) begin
+    if(reset) begin
         for(i=0; i<32; i=i+1) rf[i] <= 0;
     end
     else if(reg_wen && reg_waddr != 5'b0) begin
@@ -287,8 +290,8 @@ always@(posedge clk or posedge rst) begin
     end
 end
 */
-always@(posedge clk or posedge rst) begin
-    if(rst) begin
+always@(posedge clock or posedge reset) begin
+    if(reset) begin
         for(i=0; i<32; i=i+1) rf[i] <= 0;
     end
     else if(reg_wen && reg_waddr != 5'b0) begin
