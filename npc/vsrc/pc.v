@@ -20,6 +20,9 @@ module ysyx_25070198_ifu(
     input io_ifu_respValid
 );
 
+    reg ifu_reqValid;
+    assign io_ifu_reqValid = ifu_reqValid & !reset;
+
     //状态定义
     typedef enum logic [1:0] {
         IFU_IDLE = 2'b00,
@@ -65,7 +68,7 @@ module ysyx_25070198_ifu(
     always @(*) begin
         case (ifu_current_state)
             IFU_IDLE: begin   //00   发送取指请求
-                io_ifu_reqValid = 1'b1;
+                ifu_reqValid = 1'b1;
                 ifu_raddr = pc;
                 inst_valid = 1'b0;
                 inst_next = 32'h0;
@@ -73,7 +76,7 @@ module ysyx_25070198_ifu(
             end
 
             IFU_STAY: begin   //10   等待响应
-                io_ifu_reqValid = 1'b1;
+                ifu_reqValid = 1'b0;
                 ifu_raddr = pc;
                 inst_valid = 1'b0;
                 
@@ -88,7 +91,7 @@ module ysyx_25070198_ifu(
             end
 
             IFU_WAIT: begin   //01   等待执行完成
-                io_ifu_reqValid = 1'b0;
+                ifu_reqValid = 1'b0;
                 ifu_raddr = pc;
                 inst_valid = 1'b1;
                 inst_next = inst_reg;
@@ -102,7 +105,7 @@ module ysyx_25070198_ifu(
             end
             
             default: begin
-                io_ifu_reqValid = 1'b0;
+                ifu_reqValid = 1'b0;
                 ifu_raddr = 32'h0;
                 inst_valid = 1'b0;
                 inst_next = 32'h0;
@@ -208,7 +211,7 @@ module ysyx_25070198_exu(
     input [31:0] reg_rdata1,reg_rdata2,imm,
     output mem_ren,mem_wen,reg_wen,reg_men,
     output [31:0] reg_wdata,mem_wdata,
-    output [29:0] mem_addr,
+    output [31:0] mem_addr,
     output [3:0] mem_mask, 
     output [1:0] sel,
 
@@ -227,7 +230,7 @@ assign mem_wen = (is_sw || is_sb) && inst_valid;
 
 assign sel = {reg_rdata1 + imm}[1:0];
 
-assign mem_addr = (mem_ren || mem_wen) ? {reg_rdata1 + imm}[31:2] : 30'b0;
+assign mem_addr = (mem_ren || mem_wen) ? {reg_rdata1 + imm}[31:0] : 32'b0;
 assign mem_mask = (is_sb) ? (4'b0001 << sel):
                     (is_sw) ? 4'b1111 :
                     4'b0;

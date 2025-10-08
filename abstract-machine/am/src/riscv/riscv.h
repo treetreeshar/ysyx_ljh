@@ -21,6 +21,14 @@ static inline void outl(uintptr_t addr, uint32_t data) { *(volatile uint32_t *)a
 #define PTE_A 0x40
 #define PTE_D 0x80
 
+#define UART_BASE 0x10000000
+#define UART_TX   (UART_BASE + 0x00)
+#define UART_RX   (UART_BASE + 0x00)
+#define UART_LSR  (UART_BASE + 0x05)
+#define UART_LCR  (UART_BASE + 0x03)
+#define UART_MSB  (UART_BASE + 0x01)
+#define UART_LSB  (UART_BASE + 0x00)
+
 enum { MODE_U, MODE_S, MODE_M = 3 };
 #define MSTATUS_MXR  (1 << 19)
 #define MSTATUS_SUM  (1 << 18)

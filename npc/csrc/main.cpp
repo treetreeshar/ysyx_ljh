@@ -12,12 +12,12 @@
 
 #define ysyx_25070198_SERIAL_PORT 0xa00003f8 //abstract-machine/am/src/riscv/npc/trm.c
 #define ysyx_25070198_RTC_ADDR    0xa0000048 //abstract-machine/am/src/riscv/npc/timer.c
-#define WAVE 0
+//#define WAVE 0
 
 static VysyxSoCFull* dut;
 static vluint64_t cycle_count = 0;
 bool simulation_finished = false;
-std::map<uint32_t, uint32_t> memory;
+std::map<uint32_t, uint32_t> flash;
 static uint64_t start_time_us = 0;
 #ifdef WAVE
     static VerilatedVcdC* tfp;
@@ -38,7 +38,7 @@ extern "C" void trans(uint32_t pc0, uint32_t inst0, uint32_t a00) {
     pc = pc0;
     inst = inst0;
     a0 = a00;
-    printf("npc pc = 0x%08x\n", pc);
+    //printf("npc pc = 0x%08x\n", pc);
 }
 
 extern "C" int pmem_read(int raddr) {
@@ -54,7 +54,7 @@ extern "C" int pmem_read(int raddr) {
         return (elapsed_us >> 32) & 0xFFFFFFFF;
     }
     else{
-        return memory[aligned_addr];
+        return flash[aligned_addr];
     }
 }
 
@@ -70,7 +70,7 @@ extern "C" void pmem_write(int waddr, int wdata, char wmask) {
         return;
     }
     else {
-        uint32_t& mem_word = memory[aligned_addr]; //&：定义一个引用（别名）此地址的值
+        uint32_t& mem_word = flash[aligned_addr]; //&：定义一个引用（别名）此地址的值
         for (int i = 0; i < 4; i++) {
             if (wmask & (1 << i)) {
                 uint8_t byte = (wdata >> (8 * i)) & 0xFF;
@@ -105,7 +105,7 @@ void load_bin(const std::string& filename, uint32_t base_address) {
         for (int j = 0; j < 4; j++) {
             word |= buffer[i * 4 + j] << (8 * j);
         }
-        memory[base_address + i * 4] = word;
+        flash[base_address + i * 4] = word;
     }
 
     std::cout << "Loaded " << total_words << " words ("
@@ -147,7 +147,7 @@ void load_custom_hex(const std::string& filename, uint32_t base_address) {
         
         while (iss >> word_str) {//从流中提取以空格分隔的子字符串
             uint32_t word = std::stoul(word_str, nullptr, 16);
-            memory[full_addr] = word;
+            flash[full_addr] = word;
             full_addr += 4;
             total_words++;
         }
@@ -159,8 +159,7 @@ void load_custom_hex(const std::string& filename, uint32_t base_address) {
 }
 
 extern "C" void flash_read(int32_t addr, int32_t *data) { 
-    printf("flash_read not implemented\n");
-    assert(0); 
+    *data = flash[addr];
 }
 
 static void single_cycle() {
@@ -185,7 +184,7 @@ int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     
     const char* program_path = argv[1];
-    uint32_t base_address = 0x30000000; // 默认基地址
+    uint32_t base_address = 0x00000000; // 默认基地址
     
     if (argc >= 3) {
         char* end;
@@ -207,6 +206,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    dut = new VysyxSoCFull;
     // 初始化波形
     #ifdef WAVE
         Verilated::traceEverOn(true);
@@ -221,18 +221,19 @@ int main(int argc, char** argv) {
     long long int turn = 0;
     uint32_t a0 = 0; //x10寄存器
 
-    while (!Verilated::gotFinish() && !simulation_finished) { // && turn < 80000
+    while (!Verilated::gotFinish() && !simulation_finished) { // && turn < 400
         
         single_cycle();
         turn++;
-        /**/
-        //if (cycle_count % 4 == 0 ) {} //&& turn > 450
+        /*
+        if (cycle_count % 4000000 == 0 ) { //&& turn > 450
             std::cout << "Cycle " << cycle_count/2 
                     << ": PC=0x" << std::hex << pc
                     << " Inst=0x" << inst
                     << " x10=0x" << a0
                     << std::dec << std::endl;
-            
+        }
+        */    
         
         // 检查当前指令是否为 ebreak
         //bool is_ebreak = (current_inst == 0x00100073);

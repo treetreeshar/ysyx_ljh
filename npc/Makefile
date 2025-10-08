@@ -5,14 +5,14 @@ SOC_HOME = $(NPC_HOME)/../ysyxSoC
 
 VERILATOR_CFLAGS += --cc --build --x-assign fast --x-initial fast --timescale "1ns/1ns" --no-timing
 #VERILATOR_CFLAGS += -O3 --noassert
-VERILATOR_CFLAGS += --trace  # 波形跟踪
+#VERILATOR_CFLAGS += --trace   波形跟踪
 BUILD_DIR = ./build
 OBJ_DIR = ./obj_dir
 BIN = $(BUILD_DIR)/$(TOPNAME)
 
 #默认HEX文件路径
-FILE ?= ./logisim-bin/dummy-minirv-npc.bin
-BASE_ADDR ?= 0x30000000
+FILE ?= ./logisim-bin/hello-minirv-ysyxsoc.bin
+BASE_ADDR ?= 0x00000000
 
 default: $(BIN)
 

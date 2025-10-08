@@ -19,10 +19,14 @@ void __am_timer_uptime(AM_TIMER_UPTIME_T *uptime) {
 */
 void __am_timer_uptime(AM_TIMER_UPTIME_T *uptime) {
   uint32_t hi, lo;
-  do {
+  /*do {
     lo = inl(0xa0000048);
     hi = inl(0xa000004C);
   } while (hi != inl(0xa000004C));//防止还在读取过程中就进位了
+   */
+  asm volatile ("csrr %0, mcycle" : "=r"(lo));
+  asm volatile ("csrr %0, mcycleh" : "=r"(hi));
+
   uptime->us = ((uint64_t)hi << 32) | lo;
 }
 

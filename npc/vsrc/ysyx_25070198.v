@@ -42,7 +42,7 @@ module ysyx_25070198(
     wire [31:0] reg_rdata1, reg_rdata2;
     wire mem_ren, mem_wen, reg_wen, reg_men;
     wire [31:0] reg_wdata, mem_wdata;
-    wire [29:0] mem_addr;
+    wire [31:0] mem_addr;
     wire [3:0] mem_mask;
     wire [1:0] sel;
 
@@ -240,7 +240,7 @@ module ysyx_25070198(
         .reset(reset),
         .mem_ren(mem_ren),
         .mem_wen(mem_wen),
-        .mem_addr({mem_addr, 2'b0}),
+        .mem_addr(mem_addr),
         .mem_wdata(mem_wdata),
         .mem_mask(mem_mask),
         .mem_rdata(mem_rdata),
